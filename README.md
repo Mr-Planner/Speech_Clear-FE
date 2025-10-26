@@ -14,6 +14,10 @@
 
 `npm install dayjs` : 날짜표시
 
+`npm i zod` : Form 데이터 구조 검증 (dB, WPM등의 데이터)
+
+`npm i react-hot-toast` : 녹음 관련 알림 (시작, 중지, 업로드 완료.. etc)
+
 **UI & Style**
 
 `npm i tailwindcss @tailwindcss/vite` : tailwindcss 사용
@@ -22,7 +26,9 @@
 
 `npm install react-icons` : 아이콘 넣기
 
-`npm i chart.js react-chartjs-2 chartjs-plugin-streaming` : chart.js 사용 (실시간 dB그래프)
+`npm i framer-motion` : UI 애니메이션
+
+`npm i chart.js react-chartjs-2` : chart.js 사용 (실시간 dB그래프)
 
 `npm i wavesurfer.js` : 파형 시각화 (녹음시에)
 
