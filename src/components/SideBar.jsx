@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import angleRight from "../assets/sidebar/angle-right.svg";
 import angleUp from "../assets/sidebar/angle-up.svg";
 import archive from "../assets/sidebar/archive.svg";
@@ -13,15 +15,19 @@ import trash from "../assets/sidebar/trash.svg";
 import { Link } from "react-router-dom";
 
 // todo sideBar open여부는 HomePage가 소유 (props로 전달)
-// todo 설정은 화면 기준으로 보이게 (바닥에서 몇 %)
+// todo 설정은 화면 기준으로 보이게  (바닥에서 몇 %)
 function SideBar() {
+
+    const navigate = useNavigate();
+
     // back : 아이디는 서버에서 받아야 (URL 용도)
     const folders = [{ id: crypto.randomUUID(), name: "수업" },
     { id: crypto.randomUUID(), name: "동아리" },
     { id: crypto.randomUUID(), name: "인턴" }];
     
+    
     // state
-    const [isSideBarOpen, setIsSideBarOpen] = useState(true);
+    // const [isSideBarOpen, setIsSideBarOpen] = useState(true);
     const [isFolderOpen, setIsFolderOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [addingId, setAddingId] = useState(null);
@@ -117,8 +123,6 @@ function SideBar() {
         setSpeechFolders(prev => prev.filter(f => f.id !== id)); 
         setEditingId(null); // 메뉴 닫기
     };
-
-    
 
 
     // 상태 적용
@@ -224,141 +228,76 @@ function SideBar() {
                                 else {
                                     content = (
                                         <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                            <Link to={`/speech/${folder.id}`} className="truncate max-w-[150px] ">
+                                            <span  className="truncate max-w-[150px] ">
                                                 {folder.name}
-                                            </Link>
+                                            </span>
                                         </div>
                                     );
                                 }
 
                                 return (
-                                    <li key={folder.id} className="flex items-center w-full px-2 py-1">
-
-                                        
+                                    <li
+                                        key={folder.id}
+                                        className="flex items-center w-full px-2 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
+                                        onClick={() => {
+                                            if (!isAdding && !isRenaming && !isMenuOpen) {
+                                                navigate(`/speech/${folder.id}`); // 폴더 이동 
+                                            }
+                                        }}
+                                        >
                                         <img src={folderIcon} className="shrink-0 mr-2" />
 
-                                        
                                         {content}
 
-                                        {/* 오른쪽 메뉴 버튼 */}
-                                        <div className="relative shrink-0">
+                                        <div className="relative shrink-0 flex items-center h-full">
 
-                                        
-                                        {(!isAdding && !isRenaming) && (
+                                            {(!isAdding && !isRenaming) && (
                                             <button
-                                                className="hover:bg-gray-300 rounded cursor-pointer ml-1 p-1.5"
-                                                onClick={() => modifyFolder(folder.id)}
+                                                className="hover:bg-gray-300 rounded cursor-pointer px-2 flex items-center justify-center h-[75%]"
+
+                                                onClick={(e) => {
+                                                e.stopPropagation();   // 해당 폴더이름으로 이동 방지
+                                                modifyFolder(folder.id);
+                                                }}
                                             >
-                                            <img src={overflowMenu} className="pointer-events-none" />
+                                                <img src={overflowMenu} className="pointer-events-none w-3 h-3 " />
                                             </button>
-                                        )}
+                                            )}
 
-                                        {/* 메뉴 열린 경우 */}
-                                        {isMenuOpen && (
-                                            <div className="absolute top-full right-0 mt-1 z-50 translate-x-[55px] -translate-y-[2px] flex flex-col
-                                                            bg-gray-200 border shadow-sm rounded text-sm w-[50px]">
-                                            <button
-                                                className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
-                                                onClick={() => startRename(folder.id, folder.name)} // rename 시작
+                                            {isMenuOpen && (
+                                            <div
+                                                className="absolute top-full right-0 mt-1 z-50 flex flex-col translate-x-[55px] -translate-y-0.5
+                                                        bg-gray-200 border shadow-sm rounded text-sm w-[60px]"
+                                                onClick={(e) => e.stopPropagation()} //  해당 폴더이름으로 이동 방지
                                             >
+                                                <button
+                                                    className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
+                                                    onClick={() => startRename(folder.id, folder.name)}
+                                                >
                                                 수정
-                                            </button>
-                                            <button
-                                                className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
-                                                onClick={() => deleteFolder(folder.id)} // 삭제
-                                            >
+                                                </button>
+                                                <button
+                                                    className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
+                                                    onClick={() => deleteFolder(folder.id)}
+                                                >
                                                 삭제
-                                            </button>
+                                                </button>
                                             </div>
-                                        )}
+                                            )}
+
                                         </div>
                                     </li>
                                     );
                             })
                             }
-
-                            {
-                                // isFolderOpen &&
-                                // speechFolders.map((folder) => (
-                                
-                                    
-                                // <li key={folder.id} className="flex items-center w-full px-2 py-1">
-
-                                //     <div className="flex items-center gap-2 flex-1">
-
-                                //         <img src={folderIcon} className="shrink-0" />
-
-                                //         {addingId === folder.id ? (
-                                //             <div className="flex items-center gap-2 flex-1 overflow-hidden flex-nowrap">
-
-                                //                 <input
-                                //                 autoFocus
-                                //                 className="border rounded px-1 text-sm min-w-[100px] max-w-[150px] shrink"
-                                //                 value={tempFolderName}
-                                //                 onChange={(e) => setTempFolderName(e.target.value)}
-                                //                 placeholder="폴더 이름"
-                                //                 onKeyDown={(e) => {
-                                //                     if (e.key === "Enter") {
-                                //                         saveFolderName(folder.id);
-                                //                     }
-                                //                     if (e.key === "Escape") {
-                                //                         cancelFolderName(folder.id);
-                                //                     }
-                                //                 }}
-                                //                 />
-
-                                //                 <div className="flex gap-1 shrink-0">
-                                //                         <button className="text-blue-600 text-xs hover:bg-gray-300 rounded cursor-pointer"
-                                //                             onClick={() => saveFolderName(folder.id)}>저장</button>
-                                //                         <button className="text-gray-500 text-xs hover:bg-gray-300 rounded cursor-pointer"
-                                //                             onClick={() => cancelFolderName(folder.id)}>취소</button>
-                                //                 </div>
-
-                                //             </div>
-                                //         ) : (
-                                //         <Link to={`/speech/${folder.id}`} className="truncate max-w-[150px]">
-                                //             {folder.name}
-                                //         </Link>
-                                //         )}
-                                            
-
-                                //     </div>
-
-                                //     <div className="relative">
-                                //         {/* rename시에는 메뉴 버튼 안보이게 */}
-                                //         {
-                                //             (addingId !== folder.id) && (
-                                //             <button 
-                                //                 className="hover:bg-gray-300 rounded cursor-pointer ml-1 shrink-0 p-1.5"
-                                //                 onClick={() => modifyFolder(folder.id)}
-                                //             > 
-                                //                 <img src={overflowMenu} className="pointer-events-none"/>
-                                //             </button>
-                                //             )
-                                //         }
-
-                                //         {
-                                //             editingId === folder.id && (
-                                //                     <div className="absolute top-full right-0 mt-1 z-50 translate-x-[55px] -translate-y-[2px] flex flex-col 
-                                //                                   bg-gray-200 border shadow-sm rounded text-sm w-[50px]">
-                                //                     <button className="px-2 py-1 hover:bg-gray-300 cursor-pointer">수정</button>
-                                //                     <button className="px-2 py-1 hover:bg-gray-300 cursor-pointer">삭제</button>
-                                //                 </div>
-                                //             )
-                                //         }
-                                //     </div>
-
-                                // </li>
-                                // ))
-                            }
                         </ul>
                     </li>
                         
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <div className="flex gap-1.5 items-center">
+                        <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/speech/trash">
                             <img src={trash} />
-                            <Link to="/speech/trash">휴지통</Link>
-                        </div>
+                            <span>휴지통</span>
+                        </Link>
                         <span></span>
                         <span></span>
                     </li>
@@ -366,10 +305,10 @@ function SideBar() {
             </nav>
 
             <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-6 absolute bottom-5">
-                <div className="flex gap-1.5 items-center">
+                <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/settings">
                     <img src={setting} />
-                    <Link to="/settings">설정</Link>
-                </div>
+                    <span>설정</span>
+                </Link>
                 <span></span>
                 <span></span>
             </div>
