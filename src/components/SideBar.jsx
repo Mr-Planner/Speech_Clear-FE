@@ -304,7 +304,7 @@ function SideBar() {
                 </ul>
             </nav>
 
-            <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-6 absolute bottom-5">
+            <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-6 fixed bottom-5">
                 <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/settings">
                     <img src={setting} />
                     <span>설정</span>
