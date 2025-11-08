@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { fetchFolders,createFolder, updateFolder, deleteFolderById } from "../service/folderApi";
 import angleRight from "../assets/sidebar/angle-right.svg";
 import angleUp from "../assets/sidebar/angle-up.svg";
 import archive from "../assets/sidebar/archive.svg";
@@ -14,16 +15,18 @@ import trash from "../assets/sidebar/trash.svg";
 
 import { Link } from "react-router-dom";
 
-// todo sideBar open여부는 HomePage가 소유 (props로 전달)
+// todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
 function SideBar() {
-
     const navigate = useNavigate();
 
     // back : 아이디는 서버에서 받아야 (URL 용도)
-    const folders = [{ id: crypto.randomUUID(), name: "수업" },
-    { id: crypto.randomUUID(), name: "동아리" },
-    { id: crypto.randomUUID(), name: "인턴" }];
-    
+    useEffect(() => {
+        const loadFolders = async () => {
+            const data = await fetchFolders();
+            setSpeechFolders(data);
+        };
+        loadFolders();
+    }, []);
     
     // state
     const [isFolderOpen, setIsFolderOpen] = useState(false);
@@ -33,24 +36,24 @@ function SideBar() {
     // 기존 폴더 수정, 삭제용 state
     const [renamingId, setRenamingId] = useState(null); 
 
-
     // speech 폴더명들
     // back :  모든 Speech 내부 배열은 DB에서 가져와야 함
-    const [speechFolders, setSpeechFolders] = useState(folders);
+    const [speechFolders, setSpeechFolders] = useState([]);
 
     // function
 
-    const toggleFolders = () => {
+    const toggleFolders = async() => {
         setIsFolderOpen(prev => !prev);
 
         // toggle 버튼 클릭 시 동작 중인 폴더 추가, 수정, 삭제 rollback
+        if (addingId) await deleteFolderById(addingId);
         setAddingId(null);
-        setSpeechFolders(prev => prev.filter(folder => folder.name !== ""));
         setEditingId(null); // 수정/삭제 버튼 안뜨도록 
         setRenamingId(null);
 
     }
 
+    // 폴더 추가 시에 임시 입력칸을 만드는 함수
     const addFolder = () => {
         setIsFolderOpen(true);
         const newFolderId = crypto.randomUUID();
@@ -60,7 +63,7 @@ function SideBar() {
         setTempFolderName(""); // input 태그는 항상 비어있음
     }
 
-    const saveFolderName = (targetId) => {
+    const saveFolderName = async (targetId) => {
         const trimmed = tempFolderName.trim();
 
         if (trimmed === "") {
@@ -73,11 +76,11 @@ function SideBar() {
             return;
         }
 
-        setSpeechFolders(prev =>
-            prev.map(folder =>
-                folder.id === targetId ? { ...folder, name: trimmed } : folder
-            )
-        );
+        const newFolder = await createFolder(trimmed);
+
+        setSpeechFolders(prev => prev.map(f =>
+        f.id === targetId ? newFolder : f
+        ));
 
         setAddingId(null);
         setTempFolderName("");
@@ -102,16 +105,15 @@ function SideBar() {
         setTempFolderName(currentName); // 기존 이름 input에 넣음
     }
 
-    const saveRename = (id) => {
+    const saveRename = async (id) => {
         const trimmed = tempFolderName.trim();
         if (!trimmed) return alert("폴더 이름을 입력하세요");
 
-        if (speechFolders.some(f => f.name === trimmed && f.id !== id))
+        if (speechFolders.some(folder => folder.name === trimmed && folder.id !== id))
             return alert("중복된 이름입니다");
 
-        setSpeechFolders(prev =>
-            prev.map(f => f.id === id ? { ...f, name: trimmed } : f)
-        );
+        const updated = await updateFolder(id, trimmed);
+        setSpeechFolders(prev => prev.map(folder => folder.id === id ? updated : folder));
 
         setRenamingId(null);
         setTempFolderName("");
@@ -122,8 +124,10 @@ function SideBar() {
         setTempFolderName("");
     };
 
-    const deleteFolder = (id) => {
-        setSpeechFolders(prev => prev.filter(f => f.id !== id)); 
+    const deleteFolder = async (id) => {
+        const ok = await deleteFolderById(id);
+
+        if (ok) setSpeechFolders(prev => prev.filter(folder => folder.id !== id)); 
         setEditingId(null); // 메뉴 닫기
     };
 
