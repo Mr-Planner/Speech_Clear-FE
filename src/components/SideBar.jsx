@@ -15,7 +15,6 @@ import trash from "../assets/sidebar/trash.svg";
 import { Link } from "react-router-dom";
 
 // todo sideBar open여부는 HomePage가 소유 (props로 전달)
-// todo 설정은 화면 기준으로 보이게  (바닥에서 몇 %)
 function SideBar() {
 
     const navigate = useNavigate();
@@ -27,7 +26,6 @@ function SideBar() {
     
     
     // state
-    // const [isSideBarOpen, setIsSideBarOpen] = useState(true);
     const [isFolderOpen, setIsFolderOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [addingId, setAddingId] = useState(null);
@@ -41,12 +39,16 @@ function SideBar() {
     const [speechFolders, setSpeechFolders] = useState(folders);
 
     // function
-    const toggleSideBar = () => {
-        setIsSideBarOpen(prev => !prev);
-    }
 
     const toggleFolders = () => {
         setIsFolderOpen(prev => !prev);
+
+        // toggle 버튼 클릭 시 동작 중인 폴더 추가, 수정, 삭제 rollback
+        setAddingId(null);
+        setSpeechFolders(prev => prev.filter(folder => folder.name !== ""));
+        setEditingId(null); // 수정/삭제 버튼 안뜨도록 
+        setRenamingId(null);
+
     }
 
     const addFolder = () => {
@@ -73,7 +75,7 @@ function SideBar() {
 
         setSpeechFolders(prev =>
             prev.map(folder =>
-            folder.id === targetId ? { ...folder, name: trimmed } : folder
+                folder.id === targetId ? { ...folder, name: trimmed } : folder
             )
         );
 
@@ -103,6 +105,7 @@ function SideBar() {
     const saveRename = (id) => {
         const trimmed = tempFolderName.trim();
         if (!trimmed) return alert("폴더 이름을 입력하세요");
+
         if (speechFolders.some(f => f.name === trimmed && f.id !== id))
             return alert("중복된 이름입니다");
 
@@ -129,7 +132,7 @@ function SideBar() {
     return (
         <aside className="flex flex-col bg-gray-100 w-[250px] h-screen relative">
             <div className="flex justify-end p-2">
-                <button className = "hover:bg-gray-300 rounded cursor-pointer" onClick = {toggleSideBar}>
+                <button className = "hover:bg-gray-300 rounded cursor-pointer">
                     <img src = {hideside}></img>
                 </button>
             </div>
@@ -137,18 +140,20 @@ function SideBar() {
             <nav>
                 <ul className="flex flex-col gap-2 px-4">
                     <li className="flex flex-col gap-2 ">
-                        <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
+                        <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 pl-2 pr-0.5">
                             <div className="flex gap-1.5 items-center">
                                 <img src = {archive}></img>
                                 <span>모든 Speech</span>
                             </div>
-
-                            <button className = "hover:bg-gray-300 rounded cursor-pointer" onClick = {addFolder} disabled = {addingId != null}>
-                                <img src = {plus}></img>
-                            </button>
-                            <button className = "hover:bg-gray-300 rounded cursor-pointer" onClick = {toggleFolders}>
-                                <img src = {isFolderOpen ? angleUp : angleRight}></img>
-                            </button> 
+                            <div className = "flex justify-center gap-0.5">
+                                <button className = "hover:bg-gray-300 rounded cursor-pointer p-1 w-7 h-7 flex items-center justify-center" onClick = {addFolder} disabled = {addingId != null}>
+                                    <img src = {plus}></img>
+                                </button>
+                                <button className = "hover:bg-gray-300 rounded cursor-pointer p-1 w-7 h-7 flex items-center justify-center" onClick = {toggleFolders}>
+                                    <img src = {isFolderOpen ? angleUp : angleRight}></img>
+                                </button> 
+                            </div>
+                            
                         </div>       
                         
                         <ul className="flex flex-col gap-2 pl-6">
@@ -238,7 +243,7 @@ function SideBar() {
                                 return (
                                     <li
                                         key={folder.id}
-                                        className="flex items-center w-full px-2 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
+                                        className="flex items-center w-full px-0.5 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
                                         onClick={() => {
                                             if (!isAdding && !isRenaming && !isMenuOpen) {
                                                 navigate(`/speech/${folder.id}`); // 폴더 이동 
