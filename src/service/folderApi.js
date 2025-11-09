@@ -1,4 +1,3 @@
-// src/api/folderApi.js
 let mockFolders = [
   { id: crypto.randomUUID(), name: "수업" },
   { id: crypto.randomUUID(), name: "동아리" },
