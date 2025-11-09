@@ -41,15 +41,22 @@ function SideBar() {
     const [speechFolders, setSpeechFolders] = useState([]);
 
     // function
-
     const toggleFolders = async() => {
         setIsFolderOpen(prev => !prev);
 
         // toggle 버튼 클릭 시 동작 중인 폴더 추가, 수정, 삭제 rollback
-        if (addingId) await deleteFolderById(addingId);
+        if (addingId) {
+            // 서버에서도 삭제
+            await deleteFolderById(addingId);
+
+            // 클라이언트에서도 삭제 (리스트에서 제거)
+            setSpeechFolders(prev => prev.filter(folder => folder.id !== addingId));
+        }
+
         setAddingId(null);
         setEditingId(null); // 수정/삭제 버튼 안뜨도록 
         setRenamingId(null);
+        setTempFolderName("");
 
     }
 
