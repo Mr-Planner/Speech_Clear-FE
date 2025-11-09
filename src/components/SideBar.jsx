@@ -311,16 +311,23 @@ function SideBar() {
                         <span></span>
                     </li>
                 </ul>
+
+                <ul className="px-4 absolute bottom-5 left-0 w-full">
+                    <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
+                        <Link
+                            to="/settings"
+                            className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer"
+                        >
+                            <img src={setting} alt="설정 아이콘" />
+                            <span>설정</span>
+                        </Link>
+                        <span></span>
+                        <span></span>
+                    </li>
+                </ul>
             </nav>
 
-            <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-6 fixed bottom-5">
-                <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/settings">
-                    <img src={setting} />
-                    <span>설정</span>
-                </Link>
-                <span></span>
-                <span></span>
-            </div>
+           
         </aside>
     )
 }
