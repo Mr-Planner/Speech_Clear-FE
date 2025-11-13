@@ -3,10 +3,9 @@ import { useState } from "react";
 
 import Header from "../../components/Header";
 import SideBar from "../../components/SideBar";
+import HiddenSideBar from "../../components/HiddenSideBar";
 
 function HomePage() {
-    // todo SideBar가리는 state
-    // todo <hiddenSideBar> 필요
     // todo 유저 정보 State -> SideBar, Header에 전달
     const [userName, setUserName] = useState("정상현");
     const [isLoggedIn, setIsLoggedIn] = useState(true);
@@ -24,7 +23,7 @@ function HomePage() {
              <div className="flex flex-1 overflow-hidden">
                 {   
                     isSideBarOpen ? <SideBar handleToggleSideBar={handleToggleSideBar}></SideBar> 
-                        :<div></div>
+                        : <HiddenSideBar handleToggleSideBar={handleToggleSideBar}></HiddenSideBar>
                 }
             </div>
         </div>
