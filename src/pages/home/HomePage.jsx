@@ -6,17 +6,27 @@ import SideBar from "../../components/SideBar";
 
 function HomePage() {
     // todo SideBar가리는 state
+    // todo <hiddenSideBar> 필요
     // todo 유저 정보 State -> SideBar, Header에 전달
     const [userName, setUserName] = useState("정상현");
     const [isLoggedIn, setIsLoggedIn] = useState(true);
+    const [isSideBarOpen, setIsSideBarOpen] = useState(true);
+
+    // function
+    const handleToggleSideBar = () => setIsSideBarOpen(prev => !prev);
 
     return (
         <div className="flex flex-col h-screen">
-            <Header className = "" userName={userName} setUserName = {setUserName}
+            <Header userName={userName} setUserName = {setUserName}
                 isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}>
             </Header>
             
-            <SideBar></SideBar>
+             <div className="flex flex-1 overflow-hidden">
+                {   
+                    isSideBarOpen ? <SideBar handleToggleSideBar={handleToggleSideBar}></SideBar> 
+                        :<div></div>
+                }
+            </div>
         </div>
     )   
 }

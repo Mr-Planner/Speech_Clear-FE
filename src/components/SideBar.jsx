@@ -17,7 +17,7 @@ import { Link } from "react-router-dom";
 
 // todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
 // todo Header 추가에 따른 설정 탭 보이게
-function SideBar() {
+function SideBar({handleToggleSideBar}) {
     const navigate = useNavigate();
 
     // back : 아이디는 서버에서 받아야 (URL 용도)
@@ -144,9 +144,9 @@ function SideBar() {
     return (
         <aside className="flex flex-col bg-gray-100 w-[250px] h-full overflow-y-auto relative">
             <div className="flex justify-end p-2">
-                <button className = "hover:bg-gray-300 rounded cursor-pointer">
+            <button className = "hover:bg-gray-300 rounded cursor-pointer" onClick={handleToggleSideBar}>
                     <img src = {hideside}></img>
-                </button>
+            </button>
             </div>
 
             <nav>
