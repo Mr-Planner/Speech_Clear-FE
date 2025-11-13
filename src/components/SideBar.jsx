@@ -142,7 +142,7 @@ function SideBar() {
 
     // 상태 적용
     return (
-        <aside className="flex flex-col bg-gray-100 w-[250px] h-screen relative">
+        <aside className="flex flex-col bg-gray-100 w-[250px] h-full overflow-y-auto relative">
             <div className="flex justify-end p-2">
                 <button className = "hover:bg-gray-300 rounded cursor-pointer">
                     <img src = {hideside}></img>
