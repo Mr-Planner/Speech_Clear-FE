@@ -32,7 +32,7 @@ function Header({userName, setUserName, isLoggedIn, setIsLoggedIn}) {
                 {isLoggedIn ? (    
                     <div className="flex gap-2 items-center">
                         <div className="flex items-center gap-1 cursor-pointer">
-                            <img src={user} alt="유저 아이콘" className="w-4.5 h-4.5"></img>
+                            <img src={user} alt="유저" className="w-4.5 h-4.5"></img>
                             <span className="text-[17px] font-semibold">{userName}님</span>
                         </div>
 

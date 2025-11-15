@@ -19,8 +19,8 @@ export default function LogButton({ text, onClick }) {
         >
             <span className="text-sm font-semibold text-gray-800">{text}</span>
 
-            {text === "로그인" && <img src={logIn}></img>}
-            {text === "로그아웃" && <img src = {logOut}></img>}
+            {text === "로그인" && <img src={logIn} alt = "로그인"></img>}
+            {text === "로그아웃" && <img src = {logOut} alt = "로그아웃"></img>}
 
         </button>               
     );
