@@ -16,7 +16,9 @@ import trash from "../assets/sidebar/trash.svg";
 import { Link } from "react-router-dom";
 
 // todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
-function SideBar() {
+// todo Header 추가에 따른 설정 탭 보이게
+// todo 휴지통, 설정 탭 Link태그 대신, useNavigate() 사용 해야 함 -> 로그인 여부 확인
+function SideBar({handleToggleSideBar}) {
     const navigate = useNavigate();
 
     // back : 아이디는 서버에서 받아야 (URL 용도)
@@ -141,11 +143,11 @@ function SideBar() {
 
     // 상태 적용
     return (
-        <aside className="flex flex-col bg-gray-100 w-[250px] h-screen relative">
+        <aside className="flex flex-col bg-gray-100 w-[250px] h-full overflow-y-auto relative">
             <div className="flex justify-end p-2">
-                <button className = "hover:bg-gray-300 rounded cursor-pointer">
-                    <img src = {hideside}></img>
-                </button>
+            <button className = "hover:bg-gray-300 rounded cursor-pointer" onClick={handleToggleSideBar}>
+                    <img src = {hideside} alt = "사이드바 닫기"></img>
+            </button>
             </div>
 
             <nav>
@@ -158,10 +160,10 @@ function SideBar() {
                             </div>
                             <div className = "flex justify-center gap-0.5">
                                 <button className = "hover:bg-gray-300 rounded cursor-pointer p-1 w-7 h-7 flex items-center justify-center" onClick = {addFolder} disabled = {addingId != null}>
-                                    <img src = {plus}></img>
+                                    <img src = {plus} alt = "폴더 추가"></img>
                                 </button>
                                 <button className = "hover:bg-gray-300 rounded cursor-pointer p-1 w-7 h-7 flex items-center justify-center" onClick = {toggleFolders}>
-                                    <img src = {isFolderOpen ? angleUp : angleRight}></img>
+                                    <img src = {isFolderOpen ? angleUp : angleRight} alt = "폴더 열기/닫기"></img>
                                 </button> 
                             </div>
                             
@@ -261,7 +263,7 @@ function SideBar() {
                                             }
                                         }}
                                         >
-                                        <img src={folderIcon} className="shrink-0 mr-2" />
+                                        <img src={folderIcon} className="shrink-0 mr-2" alt = "폴더"/>
 
                                         {content}
 
@@ -276,7 +278,7 @@ function SideBar() {
                                                 modifyFolder(folder.id);
                                                 }}
                                             >
-                                                <img src={overflowMenu} className="pointer-events-none w-3 h-3 " />
+                                                <img src={overflowMenu} className="pointer-events-none w-3 h-3 " alt = "폴더 수정"/>
                                             </button>
                                             )}
 
@@ -311,7 +313,7 @@ function SideBar() {
                         
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
                         <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/speech/trash">
-                            <img src={trash} />
+                            <img src={trash} alt = "휴지통"/>
                             <span>휴지통</span>
                         </Link>
                         <span></span>
@@ -325,7 +327,7 @@ function SideBar() {
                             to="/settings"
                             className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer"
                         >
-                            <img src={setting} alt="설정 아이콘" />
+                            <img src={setting} alt="설정" />
                             <span>설정</span>
                         </Link>
                         <span></span>
