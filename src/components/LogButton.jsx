@@ -2,6 +2,7 @@ import React from "react";
 import logIn from "../assets/header/log-in.svg";
 import logOut from "../assets/header/log-out.svg";
 
+// todo 로그아웃 버튼 클릭 시, SideBar의 폴더 초기화
 export default function LogButton({ text, onClick }) {
 
     return (
@@ -17,8 +18,8 @@ export default function LogButton({ text, onClick }) {
             "
         >
             <span className="text-sm font-semibold text-gray-800">{text}</span>
-                {/* <ArrowRight size={20} className="text-gray-700" /> */}
-            {text === "로그인" && <img src = {logIn}></img>}
+
+            {text === "로그인" && <img src={logIn}></img>}
             {text === "로그아웃" && <img src = {logOut}></img>}
 
         </button>               

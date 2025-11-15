@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 
 // todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
 // todo Header 추가에 따른 설정 탭 보이게
+// todo 휴지통, 설정 탭 Link태그 대신, useNavigate() 사용 해야 함 -> 로그인 여부 확인
 function SideBar({handleToggleSideBar}) {
     const navigate = useNavigate();
 
