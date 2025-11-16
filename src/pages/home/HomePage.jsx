@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { fetchSpeeches, deleteSpeech } from "../../service/speechApi";
 import SpeechItem from "../../components/SpeechItem";
 
+// todo Mike버튼 컴포넌트 생성
 function HomePage() {
 
     const { folderId } = useParams(); // /speech, /speech/:folderId
