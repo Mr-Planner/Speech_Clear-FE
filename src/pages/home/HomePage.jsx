@@ -1,11 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../store/auth/useAuth"
 
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { fetchSpeeches, deleteSpeech } from "../../service/speechApi";
 import SpeechItem from "../../components/SpeechItem";
 
-// todo Mike버튼 컴포넌트 생성
+import recording from "../../assets/speech/recording.svg";
+
 function HomePage() {
+
+    const navigate = useNavigate();
+    const { isLoggedIn } = useAuth();
 
     const { folderId } = useParams(); // /speech, /speech/:folderId
     const realFolderId = folderId ?? "all"; // 없을 경우 '모든 Speech'라고 가정
@@ -13,6 +18,13 @@ function HomePage() {
     const queryClient = useQueryClient();
 
     // function
+    const handleRecordingClick = () => {
+        if (!isLoggedIn) {
+        navigate("/login");
+        } else {
+        navigate("/recording");
+        }
+  };
 
     // 서버에서 SpeechList가져오기
     // useQuery : GET(읽기) 전용
@@ -42,6 +54,7 @@ function HomePage() {
         deleteMutation.mutate(speechId);
     };
 
+    // todo 최신순 / 시간순 / 피드백 개수 순 정렬 예정 (완성도)
     return (
         <main className="flex-1 overflow-y-auto px-16 py-10">
             {isLoading && <p>로딩 중...</p>}
@@ -67,6 +80,11 @@ function HomePage() {
                     ))}
                 </section>
             )}
+
+            <button className="fixed bottom-8 right-8 z-9999 cursor-pointer" onClick={handleRecordingClick}>
+                <img src={recording} alt = "녹음 시작"/>
+            </button>
+            
         </main>
     )   
 }

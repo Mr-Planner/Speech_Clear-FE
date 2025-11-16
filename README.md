@@ -1,3 +1,18 @@
+## Page URL
+
+/
+├── (layout) App
+│ ├── / → HomePage
+│ ├── /:folderId → FolderPage
+│ ├── /:folderId/:speechId → SpeechDetailPage
+│ ├── /trash → TrashPage
+│ ├── /setting → SettingPage
+│ ├── /recording → RecordingPage
+│ ├── /login → LoginPage
+│ ├── /sign-up → SignUpPage
+│ ├── /:folderId/:speechId/feedback → FeedbackPage
+│ └── /:folderId/:speechId/result → ResultPage
+
 ## Libraries
 
 **Core features Library**

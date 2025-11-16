@@ -2,9 +2,8 @@ import { Link } from "react-router-dom";
 import mic from "../assets/speechitem/mic.svg";
 import trash from "../assets/speechitem/trash.svg";
 
-// todo 개별 Speech화면으로 이동 필요 (Link태그)
 // todo 넘치면 스크롤 필요
-// todo 스피치 삭제시에 alert 띄우기 (추후 완성도 측면에서)
+// todo 스피치 삭제시에 alert 띄우기 (완성도)
 const SpeechItem = ({ id, title, category, date, duration, description, folderId, onDelete }) => {
 
   const detailPath = `/${folderId}/${id}`;

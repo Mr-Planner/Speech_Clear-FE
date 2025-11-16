@@ -5,20 +5,14 @@ import SideBar from "./components/SideBar";
 import HiddenSideBar from "./components/HiddenSideBar";
 
 function App() {
-  const [userName, setUserName] = useState("정상현");
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+
   const [isSideBarOpen, setIsSideBarOpen] = useState(true);
 
   const handleToggleSideBar = () => setIsSideBarOpen(prev => !prev);
 
   return (
     <div className="flex flex-col h-screen">
-      <Header 
-        userName={userName}
-        setUserName={setUserName}
-        isLoggedIn={isLoggedIn}
-        setIsLoggedIn={setIsLoggedIn}
-      />
+      <Header/>
 
       <div className="flex flex-1">
         {isSideBarOpen 
@@ -27,7 +21,7 @@ function App() {
         }
 
         <div className="flex-1 overflow-y-auto">
-          <Outlet context={{ userName, isLoggedIn }} />  
+          <Outlet />  
         </div>
       </div>
     </div>
