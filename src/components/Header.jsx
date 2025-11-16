@@ -1,5 +1,4 @@
 // todo 유저 정보 받아서 사이드 바 표시, 로그인 여부 표시 
-// todo 라우터 구조 만들어두기..?
 import { Link } from "react-router-dom";
 import LogButton from "./LogButton";
 import user from "../assets/header/user.svg";

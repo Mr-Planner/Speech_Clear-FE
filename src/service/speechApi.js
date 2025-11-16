@@ -17,7 +17,7 @@ const BASE_URL = "https://your-api.com";
 // }
 
 export async function fetchSpeeches(folderId) {
-  // 임시(fake) 데이터
+  // 임시(fake) 데이터 (렌더링 용도)
   const mockData = [
     {
       id: 1,
