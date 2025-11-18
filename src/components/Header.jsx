@@ -1,24 +1,25 @@
 // todo 유저 정보 받아서 사이드 바 표시, 로그인 여부 표시 
-// todo 라우터 구조 만들어두기..?
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import LogButton from "./LogButton";
 import user from "../assets/header/user.svg";
+import { useAuth } from "../store/auth/useAuth";
 
+function Header() {
+    const { isLoggedIn, setIsLoggedIn, userName } = useAuth();
 
-function Header({userName, setUserName, isLoggedIn, setIsLoggedIn}) {
+    const navigate = useNavigate();
 
     // function
     const handleLogOut = () => {
-        setUserName("");
         setIsLoggedIn(false);
     }
 
     const handleLogIn = () => {
-        // 로그인 페이지로 이동
+        navigate("/login");
     }
     
     const handleSignUp = () => {
-        // 회원가입 페이지로 이동
+        navigate("/sign-up");
     }
 
     return (

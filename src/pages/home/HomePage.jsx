@@ -1,31 +1,96 @@
-import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../store/auth/useAuth"
 
-import Header from "../../components/Header";
-import SideBar from "../../components/SideBar";
-import HiddenSideBar from "../../components/HiddenSideBar";
+import { useNavigate, useParams } from "react-router-dom";
+import { fetchSpeeches, deleteSpeech } from "../../service/speechApi";
+import SpeechItem from "../../components/SpeechItem";
 
+import recording from "../../assets/speech/recording.svg";
+
+// todo 렌더링은 mock Data인 상태, 삭제 코드는 실제 서버 코드 
 function HomePage() {
-    // todo 유저 정보 State -> SideBar, Header에 전달
-    const [userName, setUserName] = useState("정상현");
-    const [isLoggedIn, setIsLoggedIn] = useState(true);
-    const [isSideBarOpen, setIsSideBarOpen] = useState(true);
+
+    const navigate = useNavigate();
+    const { isLoggedIn } = useAuth();
+
+    const { folderId } = useParams(); // /speech, /speech/:folderId
+    const realFolderId = folderId ?? "all"; // 없을 경우 '모든 Speech'라고 가정
+
+    const queryClient = useQueryClient();
 
     // function
-    const handleToggleSideBar = () => setIsSideBarOpen(prev => !prev);
+    const handleRecordingClick = () => {
+        if (!isLoggedIn) {
+        navigate("/login");
+        } else {
+        navigate("/recording");
+        }
+  };
 
+    // 서버에서 SpeechList가져오기
+    // useQuery : GET(읽기) 전용
+    const {
+        data: speeches,
+        isLoading,
+        isError,
+        error,
+    } = useQuery({
+        queryKey: ["speeches", realFolderId],       // 캐시 key (폴더별로 캐시 분리)
+        queryFn: () => fetchSpeeches(realFolderId), // 실제 fetch 함수 
+        staleTime: 1000 * 60, // 1분까지는 fresh 데이터
+    })
+
+    // useMutation : DELETE / POST / PUT 등의 데이터 변경 
+    const deleteMutation = useMutation({
+        mutationFn: (speechId) => deleteSpeech(speechId),
+        onSuccess: () => {
+            // 이 폴더의 스피치 리스트만 다시 가져오기
+            queryClient.invalidateQueries({
+                queryKey: ["speeches", realFolderId],
+            });
+        },
+        onError: (error) => {
+            console.error("삭제 실패:", error);
+            alert("스피치 삭제에 실패했습니다. 다시 시도해주세요.");
+        }
+    }); 
+
+    const handleDeleteSpeech = (speechId) => {
+        deleteMutation.mutate(speechId);
+    };
+
+    // todo 최신순 / 시간순 / 피드백 개수 순 정렬 예정 (완성도)
     return (
-        <div className="flex flex-col h-screen">
-            <Header userName={userName} setUserName = {setUserName}
-                isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}>
-            </Header>
+        <main className="flex-1 overflow-y-auto px-16 py-10">
+            {isLoading && <p>로딩 중...</p>}
+
+            {isError && (
+                <p className="text-red-500">에러: {error.message}</p>
+            )}
+
+            {speeches && (
+                <section className="mt-6 border-t border-gray-200 space-y-2">
+                    {speeches.map((speech) => (
+                        <SpeechItem
+                            key={speech.id}
+                            id={speech.id}
+                            title={speech.title}
+                            category={speech.category}
+                            date={speech.date}
+                            duration={speech.duration}
+                            description={speech.description}
+                            folderId={speech.folderId}
+                            onDelete={handleDeleteSpeech}
+                        />
+                    ))}
+                </section>
+            )}
+
+            <button className="fixed bottom-8 right-8 z-50 cursor-pointer" onClick={handleRecordingClick}>
+                <img src={recording} alt = "녹음 시작"/>
+            </button>
             
-             <div className="flex flex-1 overflow-hidden">
-                {   
-                    isSideBarOpen ? <SideBar handleToggleSideBar={handleToggleSideBar}></SideBar> 
-                        : <HiddenSideBar handleToggleSideBar={handleToggleSideBar}></HiddenSideBar>
-                }
-            </div>
-        </div>
+        </main>
     )   
 }
 
