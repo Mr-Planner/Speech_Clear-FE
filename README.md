@@ -3,7 +3,7 @@
 /
 ├── (layout) App
 │ ├── / → HomePage
-│ ├── /:folderId → FolderPage
+│ ├── /:folderId → HomePage
 │ ├── /:folderId/:speechId → SpeechDetailPage
 │ ├── /trash → TrashPage
 │ ├── /setting → SettingPage
