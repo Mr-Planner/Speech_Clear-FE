@@ -23,7 +23,7 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
 
       // 2) /:folderId
-      { path: ":folderId", element: <FolderPage /> },
+      { path: ":folderId", element: <HomePage /> },
 
       // 3) /:folderId/:speechId
       { path: ":folderId/:speechId", element: <SpeechDetailPage /> },

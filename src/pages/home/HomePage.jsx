@@ -7,6 +7,7 @@ import SpeechItem from "../../components/SpeechItem";
 
 import recording from "../../assets/speech/recording.svg";
 
+// todo 렌더링은 mock Data인 상태, 삭제 코드는 실제 서버 코드 
 function HomePage() {
 
     const navigate = useNavigate();
@@ -78,14 +79,14 @@ function HomePage() {
                             date={speech.date}
                             duration={speech.duration}
                             description={speech.description}
-                            folderId={realFolderId}
+                            folderId={speech.folderId}
                             onDelete={handleDeleteSpeech}
                         />
                     ))}
                 </section>
             )}
 
-            <button className="fixed bottom-8 right-8 z-9999 cursor-pointer" onClick={handleRecordingClick}>
+            <button className="fixed bottom-8 right-8 z-50 cursor-pointer" onClick={handleRecordingClick}>
                 <img src={recording} alt = "녹음 시작"/>
             </button>
             
