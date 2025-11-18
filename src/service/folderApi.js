@@ -3,15 +3,15 @@
 const USE_MOCK = true;   // mock 사용 시 true, 실제 서버 연동 시 false
 
 // todo 실제 서버 URL로 변경 
-const BASE_URL = "https://your-api.com";
+const BASE_URL = "http:localhost:8080";
 
 // -----------------------------
 // MOCK 데이터 영역
 
 let mockFolders = [
-  { id: crypto.randomUUID(), name: "수업" },
-  { id: crypto.randomUUID(), name: "동아리" },
-  { id: crypto.randomUUID(), name: "인턴" },
+  { id: 1, name: "수업" },
+  { id: 2, name: "동아리" },
+  { id: 3, name: "인턴" },
 ];
 
 // 폴더 목록 불러오기 (MOCK)
@@ -21,9 +21,14 @@ async function mockFetchFolders() {
 
 // 폴더 추가 (MOCK)
 async function mockCreateFolder(newName) {
-  const newFolder = { id: crypto.randomUUID(), name: newName };
+  const maxId = mockFolders.length > 0
+    ? Math.max(...mockFolders.map(f => f.id))
+    : 0;
+
+  const newFolder = { id: maxId + 1, name: newName };
   mockFolders = [newFolder, ...mockFolders];
-  return Promise.resolve(newFolder);
+
+  return Promise.resolve(newFolder); // { id, name }
 }
 
 // 폴더 수정 (MOCK)
@@ -45,7 +50,7 @@ async function mockDeleteFolderById(id) {
 
 // 폴더 목록 (Real)
 async function realFetchFolders() {
-  const res = await fetch(`${BASE_URL}/folders`, {
+  const res = await fetch(`${BASE_URL}/category`, {
     credentials: "include",
   });
 
@@ -56,7 +61,7 @@ async function realFetchFolders() {
 
 // 폴더 추가 (Real)
 async function realCreateFolder(name) {
-  const res = await fetch(`${BASE_URL}/folders`, {
+  const res = await fetch(`${BASE_URL}/category`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -70,7 +75,7 @@ async function realCreateFolder(name) {
 
 // 폴더 수정 (Real)
 async function realUpdateFolder(id, name) {
-  const res = await fetch(`${BASE_URL}/folders/${id}`, {
+  const res = await fetch(`${BASE_URL}/category/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -84,7 +89,7 @@ async function realUpdateFolder(id, name) {
 
 // 폴더 삭제 (Real)
 async function realDeleteFolderById(id) {
-  const res = await fetch(`${BASE_URL}/folders/${id}`, {
+  const res = await fetch(`${BASE_URL}/category/${id}`, {
     method: "DELETE",
     credentials: "include",
   });

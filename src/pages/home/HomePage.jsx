@@ -48,6 +48,10 @@ function HomePage() {
                 queryKey: ["speeches", realFolderId],
             });
         },
+        onError: (error) => {
+            console.error("삭제 실패:", error);
+            alert("스피치 삭제에 실패했습니다. 다시 시도해주세요.");
+        }
     }); 
 
     const handleDeleteSpeech = (speechId) => {
