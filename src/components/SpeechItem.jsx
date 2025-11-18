@@ -29,7 +29,11 @@ const SpeechItem = ({ id, title, category, date, duration, description, folderId
           <span className="text-sm text-gray-600">{duration}</span>
                 
           <button className="hover:bg-gray-100 p-1 rounded cursor-pointer"
-              onClick={() => onDelete(id)}>
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(id)
+            }}>
               <img src={trash} alt="스피치 삭제" className="w-4 h-4" />
           </button>
         </div>
