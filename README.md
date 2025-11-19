@@ -29,7 +29,7 @@
 
 `npm install react-router-dom` : 리액트 라우터
 
-`npm install @reduxjs/toolkit react-redux` : 전역 상태 관리
+`npm install zustand` : 전역 상태 관리
 
 `npm install @tanstack/react-query` : 서버 상태 관리, 데이터 캐싱
 
