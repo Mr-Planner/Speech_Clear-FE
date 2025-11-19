@@ -9,7 +9,7 @@ function App() {
   const [isSideBarOpen, setIsSideBarOpen] = useState(true);
 
   const location = useLocation(); // 현재 path 경로 정보 가져오기
-  const hideSidebarPaths = ["/login", "/sign-up", "recording"];
+  const hideSidebarPaths = ["/login", "/sign-up", "/recording"];
   const showSideBar = !hideSidebarPaths.includes(location.pathname);
 
   const handleToggleSideBar = () => setIsSideBarOpen(prev => !prev);

@@ -13,7 +13,7 @@ function Header() {
 
 
     const handleLogIn = () => navigate("/login");
-    const handleSignUp = () => navigate("/sign-up"); // 나중에 구현
+    const handleSignUp = () => navigate("/sign-up"); 
     const handleLogOut = () => {
         logout();
         navigate("/login");

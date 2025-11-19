@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { loginRequest } from "../../service/authApi";
 
+// todo localStorage에 accessToken, refreshToken 저장 X (다른 방법 사용)
 export const useAuthStore = create(
   persist(
     (set) => ({
