@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { checkEmailRequest } from "../../service/authApi";
 import { useAuthStore } from "../../store/auth/authStore";
 
 const SignUpPage = () => {
@@ -11,13 +12,32 @@ const SignUpPage = () => {
   const [passwordCheck, setPasswordCheck] = useState("");
   const [name, setName] = useState("");
   const [gender, setGender] = useState("");
+  
+  const [isEmailChecked, setIsEmailChecked] = useState(false); // 중복 확인 여부
 
-  const handleDuplicateCheck = () => {
-    alert("중복확인 API 연결 예정");
+  const handleDuplicateCheck = async () => {
+    if (!email.trim()) {
+        alert("이메일을 입력해주세요.");
+        return;
+    }
+
+    try {
+        await checkEmailRequest(email);
+        alert("사용 가능한 이메일입니다.");
+        setIsEmailChecked(true);
+    } catch (error) {
+        alert(error.message);
+        setIsEmailChecked(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isEmailChecked) {
+        alert("이메일 중복 확인을 해주세요.");
+        return;
+    }
 
     if (!email.trim() || !password.trim() || !passwordCheck.trim() || !name.trim()) {
       alert("필수 입력값을 모두 입력해주세요.");
@@ -53,7 +73,10 @@ const SignUpPage = () => {
             type="email"
             placeholder="아이디 (이메일 형식 입력)"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+                setEmail(e.target.value);
+                setIsEmailChecked(false); // 이메일 변경 시 중복 확인 초기화
+            }}
             className="
               flex-1 border border-gray-200 rounded-2xl
               px-4 py-3 text-gray-800 text-base

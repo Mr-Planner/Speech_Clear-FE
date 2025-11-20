@@ -64,3 +64,21 @@ export async function logoutRequest() {
     // 로그아웃 실패해도 클라이언트에서는 로그아웃 처리 진행
   }
 }
+
+// 이메일 중복 확인 요청
+export async function checkEmailRequest(email) {
+
+  try {
+    const response = await api.post("/check-email", { email });
+    return response.data; // { isDuplicate: boolean } 등 서버 응답에 따라 다름
+  }
+  catch (error) {
+    if (error.response?.status === 409) {
+      throw new Error("이미 사용 중인 이메일입니다.");
+    } else if (error.response?.status >= 500) {
+      throw new Error("서버 오류가 발생했습니다.");
+    } else {
+      throw new Error("중복 확인 중 오류가 발생했습니다.");
+    }
+  }
+}
