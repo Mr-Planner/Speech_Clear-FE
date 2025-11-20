@@ -7,10 +7,10 @@ import { useAuthStore } from "../store/auth/authStore";
 function Header() {
     const navigate = useNavigate();
 
+    // zustand selector -> isLoggedIn의 변경만 감지 
     const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
     const userName = useAuthStore((s) => s.userName);
     const logout = useAuthStore((s) => s.logout);
-
 
     const handleLogIn = () => navigate("/login");
     const handleSignUp = () => navigate("/sign-up"); 

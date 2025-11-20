@@ -1,6 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/auth/authStore";
 
 const SignUpPage = () => {
+  const navigate = useNavigate();
+  const signup = useAuthStore((state) => state.signup);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordCheck, setPasswordCheck] = useState("");
@@ -11,7 +16,7 @@ const SignUpPage = () => {
     alert("중복확인 API 연결 예정");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim() || !passwordCheck.trim() || !name.trim()) {
@@ -24,7 +29,14 @@ const SignUpPage = () => {
       return;
     }
 
-    alert("회원가입 API 연결 예정");
+    try {
+      await signup(email, password, name, gender);
+      alert("회원가입이 완료되었습니다. 로그인해주세요.");
+      navigate("/login");
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
   return (
