@@ -79,12 +79,18 @@ export async function logoutRequest() {
 
 // 이메일 중복 확인 요청
 export async function checkEmailRequest(email) {
-
   try {
-    const response = await api.post("/check-email", { email });
+    // 중복 확인도 Form Data 형식으로 통일
+    const formData = new URLSearchParams();
+    formData.append("email", email);
+
+    const response = await api.post("/check-email", formData, {
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+    });
     return response.data; // { isDuplicate: boolean } 등 서버 응답에 따라 다름
-  }
-  catch (error) {
+  } catch (error) {
     if (error.response?.status === 409) {
       throw new Error("이미 사용 중인 이메일입니다.");
     } else if (error.response?.status >= 500) {
