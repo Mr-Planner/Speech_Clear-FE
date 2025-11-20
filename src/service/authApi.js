@@ -12,20 +12,26 @@ const api = axios.create({
 // 로그인 요청
 export async function loginRequest(email, password) {
   try {
-    const response = await api.post("/login", {
-      email,
-      password,
+    // 422 에러 해결 시도: JSON 대신 Form Data (application/x-www-form-urlencoded) 사용
+    // 많은 백엔드 프레임워크(FastAPI, Spring Security 등)가 로그인 시 이 형식을 요구
+    const formData = new URLSearchParams();
+    formData.append("email", email); // Swagger 확인 결과: 'email' 필드 사용
+    formData.append("password", password);
+
+    const response = await api.post("/login", formData, {
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
     });
 
-    // 응답 형식: { accessToken, refreshToken, userName }
-
-    // 서버에서 보낸 응답 데이터
+    // 응답 형식: { message, user, access_token, token_type }
     return response.data;
-  }
-  
-  catch (error) {
+  } catch (error) {
     if (error.response?.status === 401) {
       throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
+    } else if (error.response?.status === 422) {
+        console.error("422 Validation Error:", error.response.data);
+        throw new Error("입력값이 올바르지 않습니다. (서버가 Form Data를 원하거나 필드명이 다를 수 있음)");
     } else if (error.response?.status >= 500) {
         throw new Error("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } else {

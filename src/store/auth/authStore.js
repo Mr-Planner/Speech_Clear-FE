@@ -8,6 +8,9 @@ import { loginRequest, logoutRequest, signupRequest } from "../../service/authAp
 // create : 생성 
 export const useAuthStore = create(
   // persist : localstroge에 저장 
+  // todo accessToken, refreshToken localStorage에 저장 X (다른 방법 사용)
+  // HttpOnly Coockie + Memory 사용 
+  // Back 로직 수정 필요... (백엔드에서 쿠키로 전송해야 함)
   persist(
     (set) => ({
       // 상태 변수, 초기값 설정
@@ -19,13 +22,18 @@ export const useAuthStore = create(
       // 로그인 함수
       login: async (email, password) => {
         const data = await loginRequest(email, password); // api 요청 
-        const userName = data.userName || email;
+        
+        // 백엔드 응답 형식에 맞춰 수정
+        // { message, user: { name, ... }, access_token, ... }
+        const userName = data.user?.name || email;
+        const accessToken = data.access_token;
+        const refreshToken = null; // 현재 백엔드에서 안 줌
 
         // zustand 상태 업데이트 (로그인 성공)
         set({
           isLoggedIn: true,
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
+          accessToken,
+          refreshToken,
           userName,
         });
       },
