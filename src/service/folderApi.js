@@ -3,7 +3,7 @@
 const USE_MOCK = true;   // mock 사용 시 true, 실제 서버 연동 시 false
 
 // todo 실제 서버 URL로 변경 
-const BASE_URL = "http:localhost:8080";
+const BASE_URL = "http://localhost:8080";
 
 // -----------------------------
 // MOCK 데이터 영역

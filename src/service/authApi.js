@@ -5,7 +5,7 @@ import axios from "axios";
 const api = axios.create({
 
   // todo 실제 백엔드 주소로 수정
-  baseURL: "http://http://0.0.0.0:8080/", 
+  baseURL: "http://localhost:8080", 
   withCredentials: false,
 });
 

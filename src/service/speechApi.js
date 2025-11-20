@@ -1,5 +1,5 @@
 // todo 실제 서버 주소료 교체 
-const BASE_URL = "http:localhost:8080"; 
+const BASE_URL = "http://localhost:8080"; 
 
 // 폴더별 speech 리스트 가져오기
 // export async function fetchSpeeches(folderId) {
