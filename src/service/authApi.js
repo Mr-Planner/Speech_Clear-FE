@@ -43,11 +43,17 @@ export async function loginRequest(email, password) {
 // 회원가입 요청
 export async function signupRequest(email, password, name, gender) {
   try {
-    const response = await api.post("/register", {
-      email,
-      password,
-      name,
-      gender,
+    // 회원가입도 Form Data 형식으로 변경 (Swagger 확인)
+    const formData = new URLSearchParams();
+    formData.append("email", email);
+    formData.append("password", password);
+    formData.append("name", name);
+    formData.append("gender", gender); // 성별 추가
+    
+    const response = await api.post("/register", formData, {
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
     });
     return response.data;
   } catch (error) {
