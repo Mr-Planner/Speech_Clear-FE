@@ -81,6 +81,7 @@ const LoginPage = () => {
               rounded-2xl py-3
               disabled:opacity-60 disabled:cursor-not-allowed
               transition-colors duration-150
+              cursor-pointer
             "
           >
             {loading ? "로그인 중..." : "로그인"}

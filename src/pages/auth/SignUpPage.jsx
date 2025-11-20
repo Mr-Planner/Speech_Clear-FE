@@ -56,6 +56,7 @@ const SignUpPage = () => {
               px-3 py-2 rounded-xl bg-[#7DCC74]
               text-white text-sm font-medium
               hover:bg-[#76b85d] transition-colors
+              cursor-pointer
             "
           >
             중복확인
@@ -123,6 +124,7 @@ const SignUpPage = () => {
             text-white font-semibold text-base
             rounded-2xl py-3
             transition-colors duration-150
+            cursor-pointer
           "
         >
           회원가입
