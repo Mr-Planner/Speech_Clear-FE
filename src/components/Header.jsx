@@ -2,25 +2,22 @@
 import { Link, useNavigate } from "react-router-dom";
 import LogButton from "./LogButton";
 import user from "../assets/header/user.svg";
-import { useAuth } from "../store/auth/useAuth";
+import { useAuthStore } from "../store/auth/authStore";
 
 function Header() {
-    const { isLoggedIn, setIsLoggedIn, userName } = useAuth();
-
     const navigate = useNavigate();
 
-    // function
-    const handleLogOut = () => {
-        setIsLoggedIn(false);
-    }
+    // zustand selector -> isLoggedIn의 변경만 감지 
+    const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+    const userName = useAuthStore((s) => s.userName);
+    const logout = useAuthStore((s) => s.logout);
 
-    const handleLogIn = () => {
+    const handleLogIn = () => navigate("/login");
+    const handleSignUp = () => navigate("/sign-up"); 
+    const handleLogOut = () => {
+        logout();
         navigate("/login");
-    }
-    
-    const handleSignUp = () => {
-        navigate("/sign-up");
-    }
+    };
 
     return (
         <header className="flex justify-between items-center w-full bg-white px-6 py-2 border-b border-gray-300">

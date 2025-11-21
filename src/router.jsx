@@ -4,7 +4,6 @@ import App from "./App";
 
 // Pages
 import HomePage from "./pages/home/HomePage";
-import FolderPage from "./pages/folder/FolderPage";
 import SpeechDetailPage from "./pages/speech/SpeechDetailPage";
 import FeedbackPage from "./pages/speech/FeedbackPage";
 import ResultPage from "./pages/speech/ResultPage";

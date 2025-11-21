@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../store/auth/useAuth"
+import { useAuthStore } from "../../store/auth/authStore"
 
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchSpeeches, deleteSpeech } from "../../service/speechApi";
@@ -11,8 +11,9 @@ import recording from "../../assets/speech/recording.svg";
 function HomePage() {
 
     const navigate = useNavigate();
-    const { isLoggedIn } = useAuth();
-
+    
+    const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+    
     const { folderId } = useParams(); // /speech, /speech/:folderId
     const realFolderId = folderId ?? "all"; // 없을 경우 '모든 Speech'라고 가정
 
