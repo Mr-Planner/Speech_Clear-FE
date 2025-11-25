@@ -4,7 +4,6 @@ import axios from "axios";
 // 공통 axios 인스턴스 
 const api = axios.create({
 
-  // todo 실제 백엔드 주소로 수정
   baseURL: "http://localhost:8080", 
   withCredentials: false,
 });
@@ -12,10 +11,9 @@ const api = axios.create({
 // 로그인 요청
 export async function loginRequest(email, password) {
   try {
-    // 422 에러 해결 시도: JSON 대신 Form Data (application/x-www-form-urlencoded) 사용
-    // 많은 백엔드 프레임워크(FastAPI, Spring Security 등)가 로그인 시 이 형식을 요구
+    
     const formData = new URLSearchParams();
-    formData.append("email", email); // Swagger 확인 결과: 'email' 필드 사용
+    formData.append("email", email);
     formData.append("password", password);
 
     const response = await api.post("/login", formData, {

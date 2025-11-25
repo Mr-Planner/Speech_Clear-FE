@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { fetchFolders,createFolder, updateFolder, deleteFolderById } from "../service/folderApi";
 import angleRight from "../assets/sidebar/angle-right.svg";
 import angleUp from "../assets/sidebar/angle-up.svg";
 import archive from "../assets/sidebar/archive.svg";
@@ -11,17 +10,16 @@ import overflowMenu from "../assets/sidebar/overflow-menu.svg";
 import plus from "../assets/sidebar/plus.svg";
 import setting from "../assets/sidebar/setting.svg";
 import trash from "../assets/sidebar/trash.svg";
+import { createFolder, deleteFolderById, fetchFolders, updateFolder } from "../service/folderApi";
 
-
-import { Link } from "react-router-dom";
+import { useAuthStore } from "../store/auth/authStore";
 
 // todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
-// todo 휴지통, 설정 탭 Link태그 대신, useNavigate() 사용 해야 함 -> 로그인 여부 확인
 // todo 폴더 선택별 SpeechItem 컴포넌드들 선택 
 function SideBar({handleToggleSideBar}) {
     const navigate = useNavigate();
+    const { isLoggedIn } = useAuthStore();
 
-    // back : 아이디는 서버에서 받아야 (URL 용도)
     useEffect(() => {
         const loadFolders = async () => {
             const data = await fetchFolders();
@@ -39,10 +37,17 @@ function SideBar({handleToggleSideBar}) {
     const [renamingId, setRenamingId] = useState(null); 
 
     // speech 폴더명들
-    // back :  모든 Speech 내부 배열은 DB에서 가져와야 함
     const [speechFolders, setSpeechFolders] = useState([]);
 
     // function
+    const handleNavigation = (path) => {
+        if (isLoggedIn) {
+            navigate(path);
+        } else {
+            navigate("/login");
+        }
+    };
+
     const toggleFolders = async() => {
         setIsFolderOpen(prev => !prev);
 
@@ -196,13 +201,13 @@ function SideBar({handleToggleSideBar}) {
                                             />
                                             <div className="flex gap-1 shrink-0">
                                                 <button
-                                                    className="text-blue-600 text-xs hover:bg-gray-300 rounded"
+                                                    className="text-blue-600 text-xs cursor-pointer hover:bg-gray-300 rounded"
                                                     onClick={() => saveFolderName(folder.id)}
                                                 >
                                                 저장
                                                 </button>
                                                 <button
-                                                    className="text-gray-500 text-xs hover:bg-gray-300 rounded"
+                                                    className="text-gray-500 text-xs cursor-pointer hover:bg-gray-300 rounded"
                                                     onClick={() => cancelFolderName(folder.id)}
                                                 >
                                                 취소
@@ -312,10 +317,13 @@ function SideBar({handleToggleSideBar}) {
                     </li>
                         
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/speech/trash">
+                        <div 
+                            className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" 
+                            onClick={() => handleNavigation("/speech/trash")}
+                        >
                             <img src={trash} alt = "휴지통"/>
                             <span>휴지통</span>
-                        </Link>
+                        </div>
                         <span></span>
                         <span></span>
                     </li>
@@ -323,13 +331,13 @@ function SideBar({handleToggleSideBar}) {
 
                 <ul className="px-4 absolute bottom-5 left-0 w-full">
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <Link
-                            to="/settings"
+                        <div
+                            onClick={() => handleNavigation("/settings")}
                             className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer"
                         >
                             <img src={setting} alt="설정" />
                             <span>설정</span>
-                        </Link>
+                        </div>
                         <span></span>
                         <span></span>
                     </li>

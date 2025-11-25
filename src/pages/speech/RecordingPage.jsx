@@ -13,8 +13,9 @@ const RecordingPage = () => {
     `${dayjs().locale('ko').format('YYYY년 M월 D일 dddd')} ${dayjs().locale('en').format('hh:mm A')}`
   );
 
+  // RecordingState에 따른 타이머 수행
   useEffect(() => {
-    let interval;
+    let interval; // 타이머 ID 변수 (clearInterval을 위해)
 
     if (recordingState === 'recording') {
       interval = setInterval(() => {
