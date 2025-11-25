@@ -1,6 +1,6 @@
 // folder.js — Mock + 실제 서버 버전 통합
 
-const USE_MOCK = true;   // mock 사용 시 true, 실제 서버 연동 시 false
+const USE_MOCK = false;   // mock 사용 시 true, 실제 서버 연동 시 false
 
 // todo 실제 서버 URL로 변경 
 const BASE_URL = "http://localhost:8080";
@@ -48,10 +48,22 @@ async function mockDeleteFolderById(id) {
 // -----------------------------
 // 실제 서버 API 영역 (Real)
 
+import { useAuthStore } from "../store/auth/authStore";
+
+function getAuthHeaders() {
+  const { accessToken } = useAuthStore.getState();
+  return {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+}
+
 // 폴더 목록 (Real)
 async function realFetchFolders() {
   const res = await fetch(`${BASE_URL}/category`, {
-    credentials: "include",
+    method: "GET",
+    headers: getAuthHeaders(),
+    // credentials: "include", // 필요 시 사용 (JWT 헤더 방식이면 보통 생략 가능하나, CORS 설정에 따라 다름)
   });
 
   if (!res.ok) throw new Error("Failed to fetch folders");
@@ -63,8 +75,7 @@ async function realFetchFolders() {
 async function realCreateFolder(name) {
   const res = await fetch(`${BASE_URL}/category`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
+    headers: getAuthHeaders(),
     body: JSON.stringify({ name }),
   });
 
@@ -77,8 +88,7 @@ async function realCreateFolder(name) {
 async function realUpdateFolder(id, name) {
   const res = await fetch(`${BASE_URL}/category/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
+    headers: getAuthHeaders(),
     body: JSON.stringify({ name }),
   });
 
@@ -91,7 +101,7 @@ async function realUpdateFolder(id, name) {
 async function realDeleteFolderById(id) {
   const res = await fetch(`${BASE_URL}/category/${id}`, {
     method: "DELETE",
-    credentials: "include",
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) throw new Error("Failed to delete folder");
