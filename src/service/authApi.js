@@ -65,15 +65,8 @@ export async function signupRequest(email, password, name, gender) {
   }
 }
 
-// 로그아웃 요청 
-// todo 프론트에서 accessToken삭제로 처리 가능?
-export async function logoutRequest() {
-  try {
-    await api.post("/logout");
-  } catch (error) {
-    console.error("로그아웃 요청 실패:", error);
-  }
-}
+// 로그아웃 요청 (프론트에서 토큰 삭제로 처리하므로 사용 안 함)
+// export async function logoutRequest() { ... }
 
 // 이메일 중복 확인 요청
 export async function checkEmailRequest(email) {

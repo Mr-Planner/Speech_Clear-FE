@@ -1,8 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { loginRequest, logoutRequest, signupRequest } from "../../service/authApi";
-
-// todo localStorage에 accessToken, refreshToken 저장 X (다른 방법 사용)
+import { loginRequest, signupRequest } from "../../service/authApi";
 
 // 로그인 관련 전역상태 
 // create : 생성 
@@ -45,13 +43,8 @@ export const useAuthStore = create(
       },
 
       // 로그아웃 함수
-      logout: async () => {
-        try {
-          await logoutRequest(); // 서버에 로그아웃 요청
-        } catch (error) {
-          console.error("로그아웃 요청 중 에러 발생 (무시하고 진행)", error);
-        }
-        
+      logout: () => {
+        // 서버 요청 없이 클라이언트 상태만 초기화
         set({
           isLoggedIn: false,
           accessToken: null,
