@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/ko';
 import { useEffect, useState } from 'react';
 import { FaCheck, FaPause, FaPlay, FaStop, FaXmark } from "react-icons/fa6";
+import SavePopup from '../../components/SavePopup';
 
 dayjs.locale('ko');
 
@@ -12,6 +13,9 @@ const RecordingPage = () => {
   const [createdTime] = useState(() => 
     `${dayjs().locale('ko').format('YYYY년 M월 D일 dddd')} ${dayjs().locale('en').format('hh:mm A')}`
   );
+
+  // Save Popup State
+  const [isSavePopupOpen, setIsSavePopupOpen] = useState(false);
 
   // RecordingState에 따른 타이머 수행
   useEffect(() => {
@@ -32,6 +36,7 @@ const RecordingPage = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // functions
   const handleRecord = () => setRecordingState('recording');
   const handlePause = () => setRecordingState('paused');
   const handleResume = () => setRecordingState('recording');
@@ -42,25 +47,32 @@ const RecordingPage = () => {
   };
   
   const handleSave = () => {
-    // TODO: Implement save logic
-    console.log('Saved');
+    setIsSavePopupOpen(true);
+  };
+
+  const onSave = (title, folderId) => {
+    // TODO: Implement actual save API call here
+    console.log("Saving Speech:", {
+      title: title,
+      folderId: folderId,
+      duration: duration,
+      createdTime: createdTime
+    });
+
     setRecordingState('idle');
     setDuration(0);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-white">
-      {/* Date and Time */}
+    <div className="flex flex-col items-center justify-center h-full w-full bg-white relative">
       <div className="absolute top-40 text-5xl font-medium text-gray-800">
         {createdTime}
       </div>
 
-      {/* Timer */}
       <div className="text-6xl font-medium mb-70">
         {formatDuration(duration)}
       </div>
 
-      {/* Controls */}
       <div className="absolute bottom-20 flex items-center gap-8">
         {recordingState === 'idle' && (
           <button
@@ -114,6 +126,12 @@ const RecordingPage = () => {
           </>
         )}
       </div>
+
+      <SavePopup 
+        isOpen={isSavePopupOpen} 
+        onClose={() => setIsSavePopupOpen(false)} 
+        onSave={onSave} 
+      />
     </div>
   );
 };
