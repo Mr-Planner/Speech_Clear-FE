@@ -185,7 +185,11 @@ function SideBar({handleToggleSideBar}) {
                                                     onChange={(e) => setTempFolderName(e.target.value)}
                                                     placeholder="폴더 이름"
                                                     onKeyDown={(e) => {
-                                                        if (e.key === "Enter") saveFolderName();
+                                                        if (e.nativeEvent.isComposing) return; // 한글 조합 중 엔터 방지
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            saveFolderName();
+                                                        }
                                                         if (e.key === "Escape") cancelFolderName();
                                                     }}
                                                 />
