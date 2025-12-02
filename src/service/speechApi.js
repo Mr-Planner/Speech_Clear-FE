@@ -30,6 +30,29 @@ export async function deleteSpeech(speechId) {
   return true;
 }
 
+import { useAuthStore } from "../store/auth/authStore";
+
+// 스피치 업로드 (분석 요청)
+export async function uploadSpeech(formData) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const res = await fetch(`${BASE_URL}/voice/analyze`, {
+    method: "POST",
+    body: formData,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    // fetch가 FormData를 감지하면 Content-Type을 자동으로 설정함 (boundary 포함)
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to upload speech");
+  }
+
+  return res.json();
+}
+
 export async function fetchSpeeches(folderId) {
   // 임시(fake) 데이터 (렌더링 용도)
   const mockData = [

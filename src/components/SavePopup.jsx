@@ -11,14 +11,14 @@ const SavePopup = ({ isOpen, onClose, onSave }) => {
     }))
   );
   const [speechTitle, setSpeechTitle] = useState("");
-  const [selectedFolderId, setSelectedFolderId] = useState("all");
+  const [selectedFolderId, setSelectedFolderId] = useState(0);
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchFolders();
       setSpeechTitle("");
-      setSelectedFolderId("all");
+      setSelectedFolderId(0);
       setIsFolderDropdownOpen(false);
     }
   }, [isOpen, fetchFolders]);
@@ -26,11 +26,16 @@ const SavePopup = ({ isOpen, onClose, onSave }) => {
   if (!isOpen) return null;
 
   const handleConfirm = () => {
+    if (!speechTitle.trim()) {
+      alert("제목을 입력해주세요.");
+      return;
+    }
+    // 0(모든 Speech) 또는 특정 폴더 ID 전송
     onSave(speechTitle, selectedFolderId);
     onClose();
   };
 
-  const selectedFolderName = selectedFolderId === "all" 
+  const selectedFolderName = selectedFolderId === 0 
     ? "모든 Speech" 
     : folders.find(f => f.id === selectedFolderId)?.name || "선택하세요";
 
@@ -79,7 +84,7 @@ const SavePopup = ({ isOpen, onClose, onSave }) => {
                 <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-10 max-h-[200px] overflow-y-auto">
                   <button
                     onClick={() => {
-                      setSelectedFolderId("all");
+                      setSelectedFolderId(0);
                       setIsFolderDropdownOpen(false);
                     }}
                     className="flex items-center gap-2 w-full px-4 py-2 hover:bg-gray-100 text-left text-gray-700"
@@ -110,7 +115,7 @@ const SavePopup = ({ isOpen, onClose, onSave }) => {
         <div className="flex justify-end mt-12">
           <button 
             onClick={handleConfirm}
-            className="bg-[#81C784] hover:bg-[#66BB6A] text-white text-lg font-medium px-6 py-2 rounded-lg transition-colors"
+            className="bg-[#81C784] hover:bg-[#66BB6A] text-white text-lg font-medium px-6 py-2 rounded-lg transition-colors cursor-pointer"
           >
             저장
           </button>

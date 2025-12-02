@@ -1,8 +1,9 @@
 import dayjs from 'dayjs';
 import 'dayjs/locale/ko';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FaCheck, FaPause, FaPlay, FaStop, FaXmark } from "react-icons/fa6";
 import SavePopup from '../../components/SavePopup';
+import { uploadSpeech } from '../../service/speechApi';
 
 dayjs.locale('ko');
 
@@ -16,6 +17,11 @@ const RecordingPage = () => {
 
   // Save Popup State
   const [isSavePopupOpen, setIsSavePopupOpen] = useState(false);
+
+  // Recording Refs
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
 
   // RecordingState에 따른 타이머 수행
   useEffect(() => {
@@ -37,30 +43,90 @@ const RecordingPage = () => {
   };
 
   // functions
-  const handleRecord = () => setRecordingState('recording');
-  const handlePause = () => setRecordingState('paused');
-  const handleResume = () => setRecordingState('recording');
-  const handleStop = () => setRecordingState('stopped');
+  const handleRecord = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecordingState('recording');
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("마이크 권한이 필요합니다.");
+    }
+  };
+
+  const handlePause = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.pause();
+      setRecordingState('paused');
+    }
+  };
+
+  const handleResume = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
+      mediaRecorderRef.current.resume();
+      setRecordingState('recording');
+    }
+  };
+
+  const handleStop = () => {
+    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === "recording" || mediaRecorderRef.current.state === "paused")) {
+      mediaRecorderRef.current.stop();
+      // 스트림 트랙 중지 (마이크 끄기)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      setRecordingState('stopped');
+    }
+  };
+
   const handleCancel = () => {
     setRecordingState('idle');
     setDuration(0);
+    audioChunksRef.current = [];
   };
   
   const handleSave = () => {
     setIsSavePopupOpen(true);
   };
 
-  const onSave = (title, folderId) => {
-    // TODO: Implement actual save API call here
-    console.log("Saving Speech:", {
-      title: title,
-      folderId: folderId,
-      duration: duration,
-      createdTime: createdTime
-    });
+  const onSave = async (title, folderId) => {
+    try {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const audioFile = new File([audioBlob], "recording.webm", { type: 'audio/webm' });
 
-    setRecordingState('idle');
-    setDuration(0);
+      const formData = new FormData();
+      formData.append("file", audioFile);
+      formData.append("name", title);
+      formData.append("category_id", folderId); // 0 또는 폴더 ID 전송
+
+      console.log("Saving Speech:", {
+        name: title,
+        category_id: folderId,
+        fileSize: audioFile.size
+      });
+
+      await uploadSpeech(formData);
+      
+      alert("성공적으로 저장되었습니다.");
+      setRecordingState('idle');
+      setDuration(0);
+      audioChunksRef.current = [];
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("저장에 실패했습니다.");
+    }
   };
 
   return (
