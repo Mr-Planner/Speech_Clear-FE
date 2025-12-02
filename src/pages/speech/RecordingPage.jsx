@@ -1,9 +1,11 @@
 import dayjs from 'dayjs';
 import 'dayjs/locale/ko';
 import { useEffect, useRef, useState } from 'react';
-import { FaCheck, FaPause, FaPlay, FaStop, FaXmark } from "react-icons/fa6";
+import { FaCheck, FaPause, FaStop, FaXmark } from "react-icons/fa6";
+import { useNavigate } from 'react-router-dom';
 import SavePopup from '../../components/SavePopup';
-import { uploadSpeech } from '../../service/speechApi';
+import { BASE_URL, uploadSpeech } from '../../service/speechApi';
+import { useAuthStore } from '../../store/auth/authStore';
 
 dayjs.locale('ko');
 
@@ -101,6 +103,9 @@ const RecordingPage = () => {
     setIsSavePopupOpen(true);
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0); // 0~100
+  const navigate = useNavigate();
+
   const onSave = async (title, folderId) => {
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
@@ -117,15 +122,93 @@ const RecordingPage = () => {
         fileSize: audioFile.size
       });
 
-      await uploadSpeech(formData);
+      // 업로드 요청 (진행률 콜백 제거 - SSE로 대체)
+      // 1. SSE 연결 설정
+      const userId = useAuthStore.getState().userId;
+      if (!userId) {
+        alert("로그인이 필요합니다.");
+        return;
+      }
+      setUploadProgress(10); // 초기값 10% (분석 시작)
+
+      const eventSource = new EventSource(`${BASE_URL}/voice/progress/${userId}`);
+      console.log("SSE Connected to:", `${BASE_URL}/voice/progress/${userId}`);
+
+      // SSE 연결이 열릴 때까지 기다리는 Promise
+      const waitForConnection = new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+             // 연결이 안되더라도 일단 업로드는 진행하도록 resolve
+             console.warn("SSE Connection Timeout - proceeding with upload anyway");
+             resolve();
+        }, 5000);
+
+        eventSource.onopen = () => {
+          console.log("SSE Connection Opened");
+          clearTimeout(timeoutId); // 타임아웃 해제
+          resolve();
+        };
+        
+        eventSource.onerror = (err) => {
+          console.error("SSE Connection Error:", err);
+          // 에러 발생 시에도 타임아웃 해제하고 진행
+          clearTimeout(timeoutId);
+          reject(err);
+        };
+      });
+
+      eventSource.onmessage = (event) => {
+        console.log("SSE Message Received:", event.data);
+        const progress = parseInt(event.data, 10);
+        
+        if (!isNaN(progress)) {
+          // 0이 오더라도 최소 1%로 유지하여 로딩바가 사라지지 않게 함
+          setUploadProgress(Math.max(1, progress));
+
+          if (progress === 100) {
+            console.log("SSE Progress 100%, closing connection");
+            eventSource.close();
+          }
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("SSE Error:", err);
+        eventSource.close();
+      };
+
+      // 2. SSE 연결 대기 후 파일 업로드 요청
+      await waitForConnection;
       
-      alert("성공적으로 저장되었습니다.");
-      setRecordingState('idle');
-      setDuration(0);
-      audioChunksRef.current = [];
+      // uploadSpeech는 이제 진행률 콜백 없이 호출
+      // POST 요청이 완료되면(200 OK), 이미 작업은 끝난 것임.
+      const response = await uploadSpeech(formData);
+      
+      // 3. 업로드 완료 후 처리
+      // 강제로 100% UI 표시
+      setUploadProgress(100);
+      
+      // SSE 연결 종료
+      eventSource.close();
+
+      // 잠시 대기 후 이동 (사용자가 100%를 볼 수 있게)
+      setTimeout(() => {
+        const newSpeechId = response.voice_id || response.id; 
+
+        alert("성공적으로 저장되었습니다.");
+        
+        setRecordingState('idle');
+        setDuration(0);
+        audioChunksRef.current = [];
+        setUploadProgress(0);
+
+        // 상세 페이지로 이동
+        navigate(`/${folderId}/${newSpeechId}`);
+      }, 500);
+
     } catch (error) {
       console.error("Upload failed:", error);
       alert("저장에 실패했습니다.");
+      setUploadProgress(0);
     }
   };
 
@@ -167,12 +250,20 @@ const RecordingPage = () => {
         )}
 
         {recordingState === 'paused' && (
-          <button
-            onClick={handleResume}
-            className="w-20 h-20 rounded-full border-2 border-black flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <FaPlay className="text-3xl text-black ml-1" />
-          </button>
+          <>
+            <button
+              onClick={handleResume}
+              className="w-20 h-20 rounded-full border-2 border-black flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-red-500" />
+            </button>
+            <button
+              onClick={handleStop}
+              className="w-20 h-20 rounded-full border-2 border-black flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors"
+            >
+              <FaStop className="text-3xl text-black" />
+            </button>
+          </>
         )}
 
         {recordingState === 'stopped' && (
@@ -195,8 +286,9 @@ const RecordingPage = () => {
 
       <SavePopup 
         isOpen={isSavePopupOpen} 
-        onClose={() => setIsSavePopupOpen(false)} 
-        onSave={onSave} 
+        onClose={() => setIsSavePopupOpen(false)}
+        onSave={onSave}
+        uploadProgress={uploadProgress} // 진행률 전달
       />
     </div>
   );

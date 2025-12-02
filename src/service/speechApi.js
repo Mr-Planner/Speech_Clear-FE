@@ -1,5 +1,5 @@
 // todo 실제 서버 주소료 교체 
-const BASE_URL = "http://localhost:8080"; 
+export const BASE_URL = "http://localhost:8080"; 
 
 // 스피치 삭제 (서버)
 export async function deleteSpeech(speechId) {
@@ -17,25 +17,27 @@ export async function deleteSpeech(speechId) {
 
 import { useAuthStore } from "../store/auth/authStore";
 
+import axios from 'axios';
+
 // 스피치 업로드 (분석 요청)
-export async function uploadSpeech(formData) {
+export async function uploadSpeech(formData, onUploadProgress) {
   const accessToken = useAuthStore.getState().accessToken;
 
-  const res = await fetch(`${BASE_URL}/voice/analyze`, {
-    method: "POST",
-    body: formData,
+  const res = await axios.post(`${BASE_URL}/voice/analyze`, formData, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "multipart/form-data", // axios는 자동 설정되지만 명시적으로
     },
-    // fetch가 FormData를 감지하면 Content-Type을 자동으로 설정함 (boundary 포함)
-    credentials: "include",
+    onUploadProgress: (progressEvent) => {
+      if (onUploadProgress) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onUploadProgress(percentCompleted);
+      }
+    },
+    withCredentials: true,
   });
 
-  if (!res.ok) {
-    throw new Error("Failed to upload speech");
-  }
-
-  return res.json();
+  return res.data;
 }
 
 // 스피치 목록 조회

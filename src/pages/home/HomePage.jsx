@@ -93,8 +93,11 @@ function HomePage() {
                 </section>
             )}
 
-            <button className="fixed bottom-8 right-8 z-50 cursor-pointer" onClick={handleRecordingClick}>
-                <img src={recording} alt = "녹음 시작"/>
+            <button 
+                className="fixed bottom-8 right-8 z-50 cursor-pointer transition-all duration-300 hover:scale-110 hover:brightness-90" 
+                onClick={handleRecordingClick}
+            >
+                <img src={recording} alt = "녹음 시작" className="drop-shadow-md"/>
             </button>
             
         </main>
