@@ -1,13 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuthStore } from "../../store/auth/authStore"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from 'dayjs';
+import 'dayjs/locale/ko';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+import { useAuthStore } from "../../store/auth/authStore";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 import { useNavigate, useParams } from "react-router-dom";
-import { fetchSpeeches, deleteSpeech } from "../../service/speechApi";
 import SpeechItem from "../../components/SpeechItem";
+import { deleteSpeech, fetchSpeeches } from "../../service/speechApi";
 
 import recording from "../../assets/speech/recording.svg";
 
-// todo 렌더링은 mock Data인 상태, 삭제 코드는 실제 서버 코드 
 function HomePage() {
 
     const navigate = useNavigate();
@@ -75,12 +81,12 @@ function HomePage() {
                         <SpeechItem
                             key={speech.id}
                             id={speech.id}
-                            title={speech.title}
-                            category={speech.category}
-                            date={speech.date}
-                            duration={speech.duration}
-                            description={speech.description}
-                            folderId={speech.folderId}
+                            title={speech.name}
+                            category={speech.category_name || "미분류"}
+                            date={dayjs.utc(speech.created_at).local().locale('ko').format('M.D (ddd) h:mm A')}
+                            duration={`${Math.floor(speech.duration_sec / 60)}분 ${Math.round(speech.duration_sec % 60)}초`}
+                            description={speech.preview_text}
+                            folderId={speech.category_id}
                             onDelete={handleDeleteSpeech}
                         />
                     ))}
