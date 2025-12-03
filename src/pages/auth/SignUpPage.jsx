@@ -115,12 +115,16 @@ const SignUpPage = () => {
           placeholder="비밀번호 확인"
           value={passwordCheck}
           onChange={(e) => setPasswordCheck(e.target.value)}
-          className="
-            w-full border border-gray-200 rounded-2xl
+          className={`
+            w-full border rounded-2xl
             px-4 py-3 text-gray-800 text-base
             focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400
-          "
+            ${passwordCheck && (password !== passwordCheck) ? "border-red-500" : "border-gray-200"}
+          `}
         />
+        {passwordCheck && (password !== passwordCheck) && (
+          <p className="text-red-500 text-sm px-2">비밀번호가 일치하지 않습니다.</p>
+        )}
 
         <div className="flex items-center gap-2">
           <input
@@ -153,6 +157,7 @@ const SignUpPage = () => {
 
         <button
           type="submit"
+          disabled={!isEmailChecked}
           className="
             w-full mt-4
             bg-[#7DCC74] hover:bg-[#76b85d]
@@ -160,6 +165,7 @@ const SignUpPage = () => {
             rounded-2xl py-3
             transition-colors duration-150
             cursor-pointer
+            disabled:bg-gray-300 disabled:cursor-not-allowed disabled:hover:bg-gray-300
           "
         >
           회원가입

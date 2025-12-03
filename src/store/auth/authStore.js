@@ -1,8 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { loginRequest, logoutRequest, signupRequest } from "../../service/authApi";
-
-// todo localStorage에 accessToken, refreshToken 저장 X (다른 방법 사용)
+import { loginRequest, signupRequest } from "../../service/authApi";
 
 // 로그인 관련 전역상태 
 // create : 생성 
@@ -16,6 +14,7 @@ export const useAuthStore = create(
       // 상태 변수, 초기값 설정
       isLoggedIn: false,
       userName: null,
+      userId: null, // user_id 추가
       accessToken: null,
       refreshToken: null,
 
@@ -24,9 +23,12 @@ export const useAuthStore = create(
         const data = await loginRequest(email, password); // api 요청 
         
         // 백엔드 응답 형식에 맞춰 수정
-        // { message, user: { name, ... }, access_token, ... }
+        // { message, user: { name, ... }, access_token, user_id, ... }
+        // user_id가 최상위에 있는지 user 객체 안에 있는지 확인 필요하지만, 
+        // 일단 data.user_id 또는 data.user.id로 가정하고 저장
         const userName = data.user?.name || email;
         const accessToken = data.access_token;
+        const userId = data.user_id || data.user?.id; // user_id 저장
         const refreshToken = null; // 현재 백엔드에서 안 줌
 
         // zustand 상태 업데이트 (로그인 성공)
@@ -35,6 +37,7 @@ export const useAuthStore = create(
           accessToken,
           refreshToken,
           userName,
+          userId, // 상태에 추가
         });
       },
 
@@ -45,13 +48,8 @@ export const useAuthStore = create(
       },
 
       // 로그아웃 함수
-      logout: async () => {
-        try {
-          await logoutRequest(); // 서버에 로그아웃 요청
-        } catch (error) {
-          console.error("로그아웃 요청 중 에러 발생 (무시하고 진행)", error);
-        }
-        
+      logout: () => {
+        // 서버 요청 없이 클라이언트 상태만 초기화
         set({
           isLoggedIn: false,
           accessToken: null,

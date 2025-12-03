@@ -4,7 +4,6 @@ import axios from "axios";
 // 공통 axios 인스턴스 
 const api = axios.create({
 
-  // todo 실제 백엔드 주소로 수정
   baseURL: "http://localhost:8080", 
   withCredentials: false,
 });
@@ -12,10 +11,9 @@ const api = axios.create({
 // 로그인 요청
 export async function loginRequest(email, password) {
   try {
-    // 422 에러 해결 시도: JSON 대신 Form Data (application/x-www-form-urlencoded) 사용
-    // 많은 백엔드 프레임워크(FastAPI, Spring Security 등)가 로그인 시 이 형식을 요구
+    
     const formData = new URLSearchParams();
-    formData.append("email", email); // Swagger 확인 결과: 'email' 필드 사용
+    formData.append("email", email);
     formData.append("password", password);
 
     const response = await api.post("/login", formData, {
@@ -67,30 +65,28 @@ export async function signupRequest(email, password, name, gender) {
   }
 }
 
-// 로그아웃 요청
-export async function logoutRequest() {
-  try {
-    await api.post("/logout");
-  } catch (error) {
-    console.error("로그아웃 요청 실패:", error);
-    // 로그아웃 실패해도 클라이언트에서는 로그아웃 처리 진행
-  }
-}
+// 로그아웃 요청 (프론트에서 토큰 삭제로 처리하므로 사용 안 함)
+// export async function logoutRequest() { ... }
 
 // 이메일 중복 확인 요청
 export async function checkEmailRequest(email) {
   try {
-    // 중복 확인도 Form Data 형식으로 통일
-    const formData = new URLSearchParams();
-    formData.append("email", email);
-
-    const response = await api.post("/check-email", formData, {
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
+    const response = await api.get("/check-email", {
+      params: { email }
     });
-    return response.data; // { isDuplicate: boolean } 등 서버 응답에 따라 다름
+
+    // 200 OK여도 available: false면 중복임 -> 에러 처리
+    if (response.data && response.data.available === false) {
+        throw new Error(response.data.message || "이미 사용 중인 이메일입니다.");
+    }
+
+    return response.data; 
   } catch (error) {
+    // 위에서 throw한 에러는 그대로 전달
+    if (error.message && (error.message.includes("이미 사용 중인") || error.message === "이미 사용 중인 이메일입니다.")) {
+        throw error;
+    }
+
     if (error.response?.status === 409) {
       throw new Error("이미 사용 중인 이메일입니다.");
     } else if (error.response?.status >= 500) {

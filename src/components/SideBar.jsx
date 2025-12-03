@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { fetchFolders,createFolder, updateFolder, deleteFolderById } from "../service/folderApi";
 import angleRight from "../assets/sidebar/angle-right.svg";
 import angleUp from "../assets/sidebar/angle-up.svg";
 import archive from "../assets/sidebar/archive.svg";
@@ -12,23 +11,29 @@ import plus from "../assets/sidebar/plus.svg";
 import setting from "../assets/sidebar/setting.svg";
 import trash from "../assets/sidebar/trash.svg";
 
+import { useShallow } from 'zustand/react/shallow';
+import { useAuthStore } from "../store/auth/authStore";
+import { useFolderStore } from "../store/folder/folderStore";
 
-import { Link } from "react-router-dom";
-
-// todo 서버 통신 : 폴더 불러오기, 추가 / 수정 / 삭제 작업 서버와 통신
-// todo 휴지통, 설정 탭 Link태그 대신, useNavigate() 사용 해야 함 -> 로그인 여부 확인
 // todo 폴더 선택별 SpeechItem 컴포넌드들 선택 
 function SideBar({handleToggleSideBar}) {
     const navigate = useNavigate();
 
-    // back : 아이디는 서버에서 받아야 (URL 용도)
+    const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+    const { folders, fetchFolders, addFolder: storeAddFolder,
+        updateFolder: storeUpdateFolder, deleteFolder: storeDeleteFolder } = useFolderStore(
+        useShallow((state) => ({
+            folders: state.folders,
+            fetchFolders: state.fetchFolders,
+            addFolder: state.addFolder,
+            updateFolder: state.updateFolder,
+            deleteFolder: state.deleteFolder,
+        }))
+    );
+
     useEffect(() => {
-        const loadFolders = async () => {
-            const data = await fetchFolders();
-            setSpeechFolders(data);
-        };
-        loadFolders();
-    }, []);
+        fetchFolders();
+    }, [fetchFolders]);
     
     // state
     const [isFolderOpen, setIsFolderOpen] = useState(false);
@@ -38,23 +43,17 @@ function SideBar({handleToggleSideBar}) {
     // 기존 폴더 수정, 삭제용 state
     const [renamingId, setRenamingId] = useState(null); 
 
-    // speech 폴더명들
-    // back :  모든 Speech 내부 배열은 DB에서 가져와야 함
-    const [speechFolders, setSpeechFolders] = useState([]);
-
     // function
+    const handleNavigation = (path) => {
+        if (isLoggedIn) {
+            navigate(path);
+        } else {
+            navigate("/login");
+        }
+    };
+
     const toggleFolders = async() => {
         setIsFolderOpen(prev => !prev);
-
-        // toggle 버튼 클릭 시 동작 중인 폴더 추가, 수정, 삭제 rollback
-        if (addingId) {
-            // 서버에서도 삭제
-            await deleteFolderById(addingId);
-
-            // 클라이언트에서도 삭제 (리스트에서 제거)
-            setSpeechFolders(prev => prev.filter(folder => folder.id !== addingId));
-        }
-
         setAddingId(null);
         setEditingId(null); // 수정/삭제 버튼 안뜨도록 
         setRenamingId(null);
@@ -65,14 +64,11 @@ function SideBar({handleToggleSideBar}) {
     // 폴더 추가 시에 임시 입력칸을 만드는 함수
     const addFolder = () => {
         setIsFolderOpen(true);
-        const newFolderId = crypto.randomUUID();
-        
-        setSpeechFolders(prev => [{ id: newFolderId, name: "" }, ...prev]);
-        setAddingId(newFolderId);
-        setTempFolderName(""); // input 태그는 항상 비어있음
+        setAddingId("temp-new-id"); // 임시 ID
+        setTempFolderName(""); 
     }
 
-    const saveFolderName = async (targetId) => {
+    const saveFolderName = async () => {
         const trimmed = tempFolderName.trim();
 
         if (trimmed === "") {
@@ -80,26 +76,25 @@ function SideBar({handleToggleSideBar}) {
             return;
         }
 
-        if (speechFolders.some(folder => folder.name === trimmed)) {
+        if (folders.some(folder => folder.name === trimmed)) {
             alert("중복된 폴더 이름입니다");
             return;
         }
 
-        const newFolder = await createFolder(trimmed);
-
-        setSpeechFolders(prev => prev.map(f =>
-        f.id === targetId ? newFolder : f
-        ));
-
-        setAddingId(null);
-        setTempFolderName("");
+        try {
+            // 서버에 폴더 추가 요청
+            await storeAddFolder(trimmed);
+            setAddingId(null);
+            setTempFolderName("");
+        } catch (e) {
+            console.error(e);
+            alert("폴더 추가 실패");
+        }
     };
 
-
-    const cancelFolderName = (targetId) => {
-        // targetId에 해당하는 SpeechFolder 삭제 
-        setSpeechFolders(prev => prev.filter(folder => folder.id !== targetId));
-        setAddingId(null); // 원래 id도 삭제
+    const cancelFolderName = () => {
+        setAddingId(null); 
+        setTempFolderName("");
     }
 
     const modifyFolder = (targetId) => {
@@ -118,14 +113,17 @@ function SideBar({handleToggleSideBar}) {
         const trimmed = tempFolderName.trim();
         if (!trimmed) return alert("폴더 이름을 입력하세요");
 
-        if (speechFolders.some(folder => folder.name === trimmed && folder.id !== id))
+        if (folders.some(folder => folder.name === trimmed && folder.id !== id))
             return alert("중복된 이름입니다");
 
-        const updated = await updateFolder(id, trimmed);
-        setSpeechFolders(prev => prev.map(folder => folder.id === id ? updated : folder));
-
-        setRenamingId(null);
-        setTempFolderName("");
+        try {
+            await storeUpdateFolder(id, trimmed);
+            setRenamingId(null);
+            setTempFolderName("");
+        } catch (e) {
+            console.error(e);
+            alert("폴더 수정 실패");
+        }
     };
 
     const cancelRename = () => {
@@ -134,10 +132,14 @@ function SideBar({handleToggleSideBar}) {
     };
 
     const deleteFolder = async (id) => {
-        const ok = await deleteFolderById(id);
-
-        if (ok) setSpeechFolders(prev => prev.filter(folder => folder.id !== id)); 
-        setEditingId(null); // 메뉴 닫기
+        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+        try {
+            await storeDeleteFolder(id);
+            setEditingId(null); 
+        } catch (e) {
+            console.error(e);
+            alert("폴더 삭제 실패");
+        }
     };
 
 
@@ -170,152 +172,160 @@ function SideBar({handleToggleSideBar}) {
                         </div>       
                         
                         <ul className="flex flex-col gap-2 pl-6">
-                            {isFolderOpen &&
-                            speechFolders.map((folder) => {
+                            {isFolderOpen && (
+                                <>
+                                    {addingId && (
+                                        <li className="flex items-center w-full px-0.5 py-1 min-h-8 cursor-pointer hover:bg-gray-200">
+                                            <img src={folderIcon} className="shrink-0 mr-2" alt = "폴더"/>
+                                            <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                                                <input
+                                                    autoFocus
+                                                    className="border rounded px-1 text-sm min-w-[100px] max-w-[150px] shrink"
+                                                    value={tempFolderName}
+                                                    onChange={(e) => setTempFolderName(e.target.value)}
+                                                    placeholder="폴더 이름"
+                                                    onKeyDown={(e) => {
+                                                        if (e.nativeEvent.isComposing) return; // 한글 조합 중 엔터 방지
+                                                        if (e.key === "Enter") {
+                                                            e.preventDefault();
+                                                            saveFolderName();
+                                                        }
+                                                        if (e.key === "Escape") cancelFolderName();
+                                                    }}
+                                                />
+                                                <div className="flex gap-1 shrink-0">
+                                                    <button
+                                                        className="text-blue-600 text-xs cursor-pointer hover:bg-gray-300 rounded"
+                                                        onClick={saveFolderName}
+                                                    >
+                                                    저장
+                                                    </button>
+                                                    <button
+                                                        className="text-gray-500 text-xs cursor-pointer hover:bg-gray-300 rounded"
+                                                        onClick={cancelFolderName}
+                                                    >
+                                                    취소
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    )}
 
-                                const isAdding = addingId === folder.id;
-                                const isRenaming = renamingId === folder.id;  
-                                const isMenuOpen = editingId === folder.id;
+                                    {folders.map((folder) => {
+                                        const isRenaming = renamingId === folder.id;  
+                                        const isMenuOpen = editingId === folder.id;
 
-                                let content;
+                                        let content;
 
-                                // 새 폴더 생성 
-                                if (isAdding) {
-                                    content = (
-                                        <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                            <input
-                                                autoFocus
-                                                className="border rounded px-1 text-sm min-w-[100px] max-w-[150px] shrink"
-                                                value={tempFolderName}
-                                                onChange={(e) => setTempFolderName(e.target.value)}
-                                                placeholder="폴더 이름"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") saveFolderName(folder.id);
-                                                    if (e.key === "Escape") cancelFolderName(folder.id);
-                                                }}
-                                            />
-                                            <div className="flex gap-1 shrink-0">
-                                                <button
+                                        // 기존 폴더 이름 수정 
+                                        if (isRenaming) {
+                                            content = (
+                                                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                                                <input
+                                                    autoFocus
+                                                    className="border rounded px-1 text-sm min-w-[100px] max-w-[150px] shrink"
+                                                    value={tempFolderName}
+                                                    onChange={(e) => setTempFolderName(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                    if (e.key === "Enter") saveRename(folder.id);
+                                                    if (e.key === "Escape") cancelRename();
+                                                    }}
+                                                />
+                                                <div className="flex gap-1 shrink-0">
+                                                    <button
                                                     className="text-blue-600 text-xs hover:bg-gray-300 rounded"
-                                                    onClick={() => saveFolderName(folder.id)}
-                                                >
-                                                저장
-                                                </button>
-                                                <button
+                                                    onClick={() => saveRename(folder.id)}
+                                                    >
+                                                    저장
+                                                    </button>
+                                                    <button
                                                     className="text-gray-500 text-xs hover:bg-gray-300 rounded"
-                                                    onClick={() => cancelFolderName(folder.id)}
-                                                >
-                                                취소
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                // 기존 폴더 이름 수정 
-                                else if (isRenaming) {
-                                    content = (
-                                        <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                        <input
-                                            autoFocus
-                                            className="border rounded px-1 text-sm min-w-[100px] max-w-[150px] shrink"
-                                            value={tempFolderName}
-                                            onChange={(e) => setTempFolderName(e.target.value)}
-                                            onKeyDown={(e) => {
-                                            if (e.key === "Enter") saveRename(folder.id);
-                                            if (e.key === "Escape") cancelRename();
-                                            }}
-                                        />
-                                        <div className="flex gap-1 shrink-0">
-                                            <button
-                                            className="text-blue-600 text-xs hover:bg-gray-300 rounded"
-                                            onClick={() => saveRename(folder.id)}
-                                            >
-                                            저장
-                                            </button>
-                                            <button
-                                            className="text-gray-500 text-xs hover:bg-gray-300 rounded"
-                                            onClick={cancelRename}
-                                            >
-                                            취소
-                                            </button>
-                                        </div>
-                                        </div>
-                                    );
-                                }
-                                // 기본 폴더명
-                                else {
-                                    content = (
-                                        <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                            <span  className="truncate max-w-[150px] ">
-                                                {folder.name}
-                                            </span>
-                                        </div>
-                                    );
-                                }
+                                                    onClick={cancelRename}
+                                                    >
+                                                    취소
+                                                    </button>
+                                                </div>
+                                                </div>
+                                            );
+                                        }
+                                        // 기본 폴더명
+                                        else {
+                                            content = (
+                                                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                                                    <span  className="truncate max-w-[150px] ">
+                                                        {folder.name}
+                                                    </span>
+                                                </div>
+                                            );
+                                        }
 
-                                return (
-                                    <li
-                                        key={folder.id}
-                                        className="flex items-center w-full px-0.5 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
-                                        onClick={() => {
-                                            if (!isAdding && !isRenaming && !isMenuOpen) {
-                                                navigate(`/speech/${folder.id}`); // 폴더 이동 
-                                            }
-                                        }}
-                                        >
-                                        <img src={folderIcon} className="shrink-0 mr-2" alt = "폴더"/>
-
-                                        {content}
-
-                                        <div className="relative shrink-0 flex items-center h-full">
-
-                                            {(!isAdding && !isRenaming) && (
-                                            <button
-                                                className="hover:bg-gray-300 rounded cursor-pointer px-2 flex items-center justify-center h-[75%]"
-
-                                                onClick={(e) => {
-                                                e.stopPropagation();   // 해당 폴더이름으로 이동 방지
-                                                modifyFolder(folder.id);
+                                        return (
+                                            <li
+                                                key={folder.id}
+                                                className="flex items-center w-full px-0.5 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
+                                                onClick={() => {
+                                                    if (!isRenaming && !isMenuOpen) {
+                                                        navigate(`/speech/${folder.id}`); // 폴더 이동 
+                                                    }
                                                 }}
-                                            >
-                                                <img src={overflowMenu} className="pointer-events-none w-3 h-3 " alt = "폴더 수정"/>
-                                            </button>
-                                            )}
-
-                                            {isMenuOpen && (
-                                            <div
-                                                className="absolute top-full right-0 mt-1 z-50 flex flex-col translate-x-[55px] -translate-y-0.5
-                                                        bg-gray-200 border shadow-sm rounded text-sm w-[60px]"
-                                                onClick={(e) => e.stopPropagation()} //  해당 폴더이름으로 이동 방지
-                                            >
-                                                <button
-                                                    className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
-                                                    onClick={() => startRename(folder.id, folder.name)}
                                                 >
-                                                수정
-                                                </button>
-                                                <button
-                                                    className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
-                                                    onClick={() => deleteFolder(folder.id)}
-                                                >
-                                                삭제
-                                                </button>
-                                            </div>
-                                            )}
+                                                <img src={folderIcon} className="shrink-0 mr-2" alt = "폴더"/>
 
-                                        </div>
-                                    </li>
-                                    );
-                            })
-                            }
+                                                {content}
+
+                                                <div className="relative shrink-0 flex items-center h-full">
+
+                                                    {!isRenaming && (
+                                                    <button
+                                                        className="hover:bg-gray-300 rounded cursor-pointer px-2 flex items-center justify-center h-[75%]"
+
+                                                        onClick={(e) => {
+                                                        e.stopPropagation();   // 해당 폴더이름으로 이동 방지
+                                                        modifyFolder(folder.id);
+                                                        }}
+                                                    >
+                                                        <img src={overflowMenu} className="pointer-events-none w-3 h-3 " alt = "폴더 수정"/>
+                                                    </button>
+                                                    )}
+
+                                                    {isMenuOpen && (
+                                                    <div
+                                                        className="absolute top-full right-0 mt-1 z-50 flex flex-col translate-x-[55px] -translate-y-0.5
+                                                                bg-gray-200 border shadow-sm rounded text-sm w-[60px]"
+                                                        onClick={(e) => e.stopPropagation()} //  해당 폴더이름으로 이동 방지
+                                                    >
+                                                        <button
+                                                            className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
+                                                            onClick={() => startRename(folder.id, folder.name)}
+                                                        >
+                                                        수정
+                                                        </button>
+                                                        <button
+                                                            className="px-2 py-1 hover:bg-gray-300 cursor-pointer"
+                                                            onClick={() => deleteFolder(folder.id)}
+                                                        >
+                                                        삭제
+                                                        </button>
+                                                    </div>
+                                                    )}
+
+                                                </div>
+                                            </li>
+                                            );
+                                    })}
+                                </>
+                            )}
                         </ul>
                     </li>
                         
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <Link className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" to="/speech/trash">
+                        <div 
+                            className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" 
+                            onClick={() => handleNavigation("/speech/trash")}
+                        >
                             <img src={trash} alt = "휴지통"/>
                             <span>휴지통</span>
-                        </Link>
+                        </div>
                         <span></span>
                         <span></span>
                     </li>
@@ -323,13 +333,13 @@ function SideBar({handleToggleSideBar}) {
 
                 <ul className="px-4 absolute bottom-5 left-0 w-full">
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <Link
-                            to="/settings"
+                        <div
+                            onClick={() => handleNavigation("/settings")}
                             className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer"
                         >
                             <img src={setting} alt="설정" />
                             <span>설정</span>
-                        </Link>
+                        </div>
                         <span></span>
                         <span></span>
                     </li>

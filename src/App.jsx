@@ -1,8 +1,8 @@
-import { Outlet, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "./components/Header";
-import SideBar from "./components/SideBar";
 import HiddenSideBar from "./components/HiddenSideBar";
+import SideBar from "./components/SideBar";
 
 function App() {
 
@@ -18,7 +18,7 @@ function App() {
     <div className="flex flex-col h-screen">
       <Header/>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {showSideBar&& (isSideBarOpen
           ? <SideBar handleToggleSideBar={handleToggleSideBar} />
           : <HiddenSideBar handleToggleSideBar={handleToggleSideBar} />

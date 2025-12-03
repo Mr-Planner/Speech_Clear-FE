@@ -1,20 +1,5 @@
 // todo 실제 서버 주소료 교체 
-const BASE_URL = "http://localhost:8080"; 
-
-// 폴더별 speech 리스트 가져오기
-// export async function fetchSpeeches(folderId) {
-//   const folderQuery = folderId ? `?folderId=${folderId}` : "";
-    
-//   const res = await fetch(`${BASE_URL}/speeches${folderQuery}`, {
-//     credentials: "include", // 쿠키/세션 쓰면 유지
-//   });
-
-//   if (!res.ok) {
-//     throw new Error("Failed to fetch speeches");
-//   }
-
-//   return res.json(); // [{ id, title, category, date, duration, description }, ...]
-// }
+export const BASE_URL = "http://localhost:8080"; 
 
 // 스피치 삭제 (서버)
 export async function deleteSpeech(speechId) {
@@ -30,43 +15,51 @@ export async function deleteSpeech(speechId) {
   return true;
 }
 
-export async function fetchSpeeches(folderId) {
-  // 임시(fake) 데이터 (렌더링 용도)
-  const mockData = [
-    {
-      id: 1,
-      title: "전공심화 프로젝트 발표",
-      folderId: "1",
-      category: "수업",
-      date: "10.2 (목) 2:30 PM",
-      duration: "10분",
-      description: "안녕하세요 SpeechClear라는 주제로 발표를 하게 된...",
-    },
-    {
-      id: 2,
-      title: "동아리 면접 준비",
-      folderId: "2",      
-      category: "동아리",
-      date: "10.1 (수) 11:30 AM",
-      duration: "6분",
-      description: "안녕하세요 저는 피아노 동아리에 지원한...",
-    },
-    {
-      id: 3,
-      title: "인턴 면접 준비",
-      folderId: "3",
-      category: "인턴",
-      date: "9.27 (토) 2:30 PM",
-      duration: "8분",
-      description: "안녕하십니까 저는 이번 하기 계절학기 인턴십에 지원한...",
-    },
-  ];
+import { useAuthStore } from "../store/auth/authStore";
 
-  // 폴더 필터링(실제 API 동작 흐름 유지)
-  if (folderId && folderId !== "all") {
-    return mockData.filter((s) => s.folderId === folderId);
+import axios from 'axios';
+
+// 스피치 업로드 (분석 요청)
+export async function uploadSpeech(formData, onUploadProgress) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const res = await axios.post(`${BASE_URL}/voice/analyze`, formData, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "multipart/form-data", // axios는 자동 설정되지만 명시적으로
+    },
+    onUploadProgress: (progressEvent) => {
+      if (onUploadProgress) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onUploadProgress(percentCompleted);
+      }
+    },
+    withCredentials: true,
+  });
+
+  return res.data;
+}
+
+// 스피치 목록 조회
+export async function fetchSpeeches(folderId) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  // folderId가 0, 'all', null, undefined이면 전체 조회 (쿼리 파라미터 생략)
+  const query = folderId && folderId !== 0 && folderId !== 'all' 
+    ? `?category_id=${folderId}` 
+    : '';
+
+  const res = await fetch(`${BASE_URL}/voice/list${query}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch speeches");
   }
 
-  // all이면 전체 반환
-  return mockData;
+  const data = await res.json();
+  return data.voices; // { voices: [...] } 형태에서 배열만 반환
 }
