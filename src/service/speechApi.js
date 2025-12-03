@@ -40,6 +40,24 @@ export async function uploadSpeech(formData, onUploadProgress) {
   return res.data;
 }
 
+// 스피치 상세 조회
+export async function fetchSpeechDetail(speechId) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const res = await fetch(`${BASE_URL}/voice/${speechId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch speech detail");
+  }
+
+  return await res.json();
+}
+
 // 스피치 목록 조회
 export async function fetchSpeeches(folderId) {
   const accessToken = useAuthStore.getState().accessToken;
