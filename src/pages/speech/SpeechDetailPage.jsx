@@ -1,9 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
 import { useEffect, useState } from "react";
 import { FaChevronLeft, FaChevronRight, FaMicrophone } from "react-icons/fa6";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchSpeechDetail } from "../../service/speechApi";
+
+// 플러그인 확장
+dayjs.extend(utc);
 
 const SpeechDetailPage = () => {
   const { speechId } = useParams();
@@ -52,7 +56,8 @@ const SpeechDetailPage = () => {
   };
 
   // 날짜 포맷 (voice_created_at)
-  const formattedDate = dayjs(speech.voice_created_at).format('M.D (ddd) h:mm A');
+  // 서버에서 UTC로 주는데 'Z'가 없어서 로컬로 인식되는 문제 해결을 위해 .utc()로 파싱 후 .local()로 변환
+  const formattedDate = dayjs.utc(speech.voice_created_at).local().format('M.D (ddd) h:mm A');
   
   // 시간 포맷 (voice_duration)
   const durationMin = Math.floor(speech.voice_duration / 60);
