@@ -20,7 +20,7 @@ const SpeechDetailPage = () => {
 
   // 세그먼트 데이터가 로드되면 첫 번째 세그먼트로 초기화 (필요 시)
   useEffect(() => {
-    if (speech?.segments?.length > 0) {
+    if (speech?.scripts) {
       setCurrentSegmentIndex(0);
     }
   }, [speech]);
@@ -29,8 +29,17 @@ const SpeechDetailPage = () => {
   if (isError) return <div className="p-8 text-red-500">에러 발생: {error.message}</div>;
   if (!speech) return <div className="p-8">데이터가 없습니다.</div>;
 
-  // order_no 순으로 정렬
-  const segments = (speech.segments || []).sort((a, b) => a.order_no - b.order_no);
+  // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
+  const allSegments = (speech.scripts || []).flatMap(script => 
+    (script.segments || []).map(seg => ({
+      ...seg,
+      part: script.part // part 정보도 세그먼트에 포함시킴
+    }))
+  );
+
+  // order_no가 있으면 정렬, 없으면 그대로 (현재 JSON에는 order_no가 없음, 필요시 추가 요청하거나 인덱스 사용)
+  // JSON 예시에는 segment_id가 있으므로 이를 키로 사용
+  const segments = allSegments; 
   const currentSegment = segments[currentSegmentIndex];
   const totalSegments = segments.length;
 
@@ -42,27 +51,23 @@ const SpeechDetailPage = () => {
     if (currentSegmentIndex < totalSegments - 1) setCurrentSegmentIndex(prev => prev + 1);
   };
 
-  // 날짜 포맷
-  const formattedDate = dayjs(speech.created_at).format('M.D (ddd) h:mm A');
-  // 시간 포맷 (초 -> 분:초)
-  const durationMin = Math.floor(speech.duration_sec / 60);
-  const durationSec = Math.round(speech.duration_sec % 60);
+  // 날짜 포맷 (voice_created_at)
+  const formattedDate = dayjs(speech.voice_created_at).format('M.D (ddd) h:mm A');
+  
+  // 시간 포맷 (voice_duration)
+  const durationMin = Math.floor(speech.voice_duration / 60);
+  const durationSec = Math.round(speech.voice_duration % 60);
   const formattedDuration = `${durationMin}분 ${durationSec}초`;
 
-  // 파트별로 스크립트 그룹화
-  const groupedScripts = segments.reduce((acc, seg) => {
-    const part = seg.part || "기타";
-    if (!acc[part]) acc[part] = [];
-    acc[part].push(seg);
-    return acc;
-  }, {});
+  // 파트별로 스크립트 그룹화 (이미 speech.scripts가 그룹화되어 있으므로 그대로 사용)
+  const scripts = speech.scripts || [];
 
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
       <header className="px-8 py-6 border-b border-gray-200 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{speech.name}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{speech.voice_name}</h1>
           <div className="flex items-center gap-4 text-gray-500 text-sm">
             <span className="bg-gray-100 px-2 py-1 rounded text-gray-700 font-medium">
               {speech.category_name || "미분류"}
@@ -94,21 +99,21 @@ const SpeechDetailPage = () => {
 
           {/* Script Content */}
           <div className="space-y-8">
-            {Object.entries(groupedScripts).map(([part, partSegments]) => (
-              <div key={part}>
-                <h3 className="text-lg font-bold text-gray-800 mb-3">{part}</h3>
+            {scripts.map((script, scriptIdx) => (
+              <div key={scriptIdx}>
+                <h3 className="text-lg font-bold text-gray-800 mb-3">{script.part}</h3>
                 <div className="space-y-2">
-                  {partSegments.map((seg) => {
-                    const isCurrent = currentSegment?.id === seg.id;
+                  {script.segments.map((seg) => {
+                    const isCurrent = currentSegment?.segment_id === seg.segment_id;
                     return (
                       <p 
-                        key={seg.id} 
+                        key={seg.segment_id} 
                         className={`text-gray-700 leading-relaxed p-2 rounded cursor-pointer transition-colors
                           ${isCurrent ? 'bg-red-50 border-l-4 border-red-400 font-medium' : 'hover:bg-gray-50'}
                         `}
                         onClick={() => {
                             // 해당 세그먼트의 인덱스를 찾아서 이동
-                            const idx = segments.findIndex(s => s.id === seg.id);
+                            const idx = segments.findIndex(s => s.segment_id === seg.segment_id);
                             if (idx !== -1) setCurrentSegmentIndex(idx);
                         }}
                       >
