@@ -78,7 +78,7 @@ const SpeechDetailPage = () => {
         </div>
         <button 
           onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-[#7DCC74] hover:bg-[#66BB6A] text-white rounded-lg font-bold transition-colors"
+          className="px-4 py-2 bg-[#7DCC74] hover:bg-[#66BB6A] text-white rounded-lg font-bold transition-colors cursor-pointer"
         >
           목록으로
         </button>
@@ -135,7 +135,7 @@ const SpeechDetailPage = () => {
             <button 
               onClick={handlePrev} 
               disabled={currentSegmentIndex === 0}
-              className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
               <FaChevronLeft size={20} />
             </button>
@@ -145,7 +145,7 @@ const SpeechDetailPage = () => {
             <button 
               onClick={handleNext} 
               disabled={currentSegmentIndex === totalSegments - 1}
-              className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
               <FaChevronRight size={20} />
             </button>
@@ -184,7 +184,7 @@ const SpeechDetailPage = () => {
 
               {/* Re-record Button (Visual Only) */}
               <div className="flex justify-center mt-auto">
-                <button className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105">
+                <button className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer">
                   <FaMicrophone size={24} />
                 </button>
               </div>
