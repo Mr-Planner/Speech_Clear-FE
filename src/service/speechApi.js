@@ -40,6 +40,21 @@ export async function uploadSpeech(formData, onUploadProgress) {
   return res.data;
 }
 
+// 세그먼트 재녹음
+export async function reRecordSegment(segmentId, formData) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const res = await axios.post(`${BASE_URL}/voice/segment/${segmentId}/re_record`, formData, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "multipart/form-data",
+    },
+    withCredentials: true,
+  });
+
+  return res.data;
+}
+
 // 스피치 상세 조회
 export async function fetchSpeechDetail(speechId) {
   const accessToken = useAuthStore.getState().accessToken;
