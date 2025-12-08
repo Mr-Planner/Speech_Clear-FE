@@ -357,7 +357,7 @@ const SpeechDetailPage = () => {
         borderWidth: 2,
         fill: true,
         order: 2,
-        yAxisID: 'y', // 왼쪽 축 사용
+        yAxisID: 'y', // 명시적으로 y축 지정
       },
       {
         label: 'Recording dB',
@@ -369,7 +369,7 @@ const SpeechDetailPage = () => {
         borderWidth: 2,
         fill: false,
         order: 1,
-        yAxisID: 'y1', // 오른쪽 축 사용
+        yAxisID: 'y', // 명시적으로 y축 지정
       },
     ],
   };
@@ -424,25 +424,6 @@ const SpeechDetailPage = () => {
         ticks: {
           color: '#9CA3AF'
         },
-        title: {
-            display: false, // 공간 절약을 위해 숨김 (필요시 true)
-            text: 'Original'
-        }
-      },
-      y1: {
-        type: 'linear',
-        display: true,
-        position: 'right',
-        grid: {
-          drawOnChartArea: false, // 기존 그리드와 겹치지 않게
-        },
-        ticks: {
-          color: '#EF4444' // 녹음 축 색상은 빨간색으로 구분
-        },
-        title: {
-            display: false,
-            text: 'Recording'
-        }
       },
     },
     animation: {
