@@ -1,10 +1,35 @@
+
 import { useQuery } from "@tanstack/react-query";
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip
+} from 'chart.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Line } from 'react-chartjs-2';
 import { FaChevronLeft, FaChevronRight, FaMicrophone } from "react-icons/fa6";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchSpeechDetail } from "../../service/speechApi";
+
+// Chart.js 등록
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 // 플러그인 확장
 dayjs.extend(utc);
@@ -13,6 +38,62 @@ const SpeechDetailPage = () => {
   const { speechId } = useParams();
   const navigate = useNavigate();
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+  const audioRef = useRef(null); // 오디오 객체 관리
+
+  // 컴포넌트 언마운트 시 오디오 정지
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playAudio = async (url) => {
+    console.log("Attempting to play audio:", url);
+
+    if (!url) {
+      console.error("Audio URL is missing");
+      return;
+    }
+
+    // 기존 오디오 정지
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    try {
+      // 1. fetch로 데이터 가져오기 (CORS 및 포맷 확인용)
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Network response was not ok: ${response.status}`);
+      }
+
+      // 2. Blob으로 변환
+      const blob = await response.blob();
+      console.log("Audio Blob type:", blob.type); // 서버가 주는 타입 확인
+
+      // 3. 타입이 없거나 이상하면 강제로 wav로 설정해보기 (필요시)
+      // const audioBlob = new Blob([blob], { type: 'audio/wav' }); 
+      
+      // 4. Blob URL 생성
+      const audioUrl = URL.createObjectURL(blob);
+      
+      // 5. 재생
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      await audio.play();
+      console.log("Audio playing successfully");
+
+    } catch (err) {
+      console.error("Audio play failed:", err);
+      alert("오디오 재생 실패: " + err.message);
+    }
+  };
 
   const { data: speech, isLoading, isError, error } = useQuery({
     queryKey: ["speech", speechId],
@@ -67,6 +148,83 @@ const SpeechDetailPage = () => {
   // 파트별로 스크립트 그룹화 (이미 speech.scripts가 그룹화되어 있으므로 그대로 사용)
   const scripts = speech.scripts || [];
 
+  // 그래프 데이터 준비
+  const dBList = currentSegment?.dB_list || [];
+  const startTime = currentSegment?.start || 0;
+  const endTime = currentSegment?.end || 0;
+  const duration = endTime - startTime;
+  // 데이터 포인트 간의 시간 간격 계산 (전체 시간 / 데이터 개수)
+  const interval = dBList.length > 1 ? duration / (dBList.length - 1) : 0;
+
+  const chartData = {
+    labels: dBList.map((_, i) => {
+      const time = startTime + interval * i;
+      const min = Math.floor(time / 60);
+      const sec = Math.floor(time % 60);
+      return `${min}:${sec.toString().padStart(2, '0')}`;
+    }),
+    datasets: [
+      {
+        label: 'Decibel (dB)',
+        data: dBList,
+        borderColor: '#7DCC74', // 테마색 (초록)
+        backgroundColor: 'rgba(125, 204, 116, 0.1)', // 배경색 (연한 초록)
+        tension: 0.4, // 부드러운 곡선
+        pointRadius: 0, // 포인트 숨김
+        pointHoverRadius: 4, // 호버 시 포인트 표시
+        borderWidth: 2,
+        fill: true,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        padding: 10,
+        displayColors: false,
+        callbacks: {
+          label: (context) => `Volume: ${context.parsed.y} dB`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+            maxTicksLimit: 8,
+            color: '#9CA3AF'
+        }
+      },
+      y: {
+        grid: {
+          color: '#F3F4F6',
+        },
+        ticks: {
+          color: '#9CA3AF'
+        },
+        // dB 값 범위에 따라 조정 가능 (예: -60 ~ 0)
+        // min: -60, 
+        // max: 0
+      },
+    },
+    animation: {
+        duration: 0 // 즉각적인 반응을 위해 애니메이션 최소화 (선택사항)
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
@@ -119,7 +277,10 @@ const SpeechDetailPage = () => {
                         onClick={() => {
                             // 해당 세그먼트의 인덱스를 찾아서 이동
                             const idx = segments.findIndex(s => s.segment_id === seg.segment_id);
-                            if (idx !== -1) setCurrentSegmentIndex(idx);
+                            if (idx !== -1) {
+                              setCurrentSegmentIndex(idx);
+                              playAudio(seg.segment_url); // 오디오 재생
+                            }
                         }}
                       >
                         {seg.text}
@@ -158,9 +319,15 @@ const SpeechDetailPage = () => {
 
           {currentSegment ? (
             <>
-              {/* Graph Placeholder */}
-              <div className="bg-white border border-gray-200 rounded-xl h-64 mb-8 flex items-center justify-center shadow-sm">
-                <p className="text-gray-400">Graph Area (Placeholder)</p>
+              {/* Graph Area */}
+              <div className="bg-white border border-gray-200 rounded-xl h-64 mb-8 p-4 shadow-sm relative w-full">
+                {dBList.length > 0 ? (
+                    <Line data={chartData} options={chartOptions} />
+                ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                        데이터가 없습니다.
+                    </div>
+                )}
               </div>
 
               {/* Metrics */}
