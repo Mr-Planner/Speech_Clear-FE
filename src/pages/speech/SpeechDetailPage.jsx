@@ -282,31 +282,47 @@ const SpeechDetailPage = () => {
                     setIsProcessing(false);
                     setUploadProgress(0);
 
-                    // 응답으로 받은 데이터(새로운 피드백 등)를 즉시 화면에 반영 (낙관적 업데이트 유사 방식)
-                    queryClient.setQueryData(["speech", speechId], (oldData) => {
-                        if (!oldData || !oldData.scripts) return oldData;
+                    // 응답으로 받은 데이터(새로운 피드백, 버전 정보 등)를 처리
+                // 가정: response가 새로 생성된 Version 객체이거나, 최소한 dB_list와 metrics를 포함함
+                // 안전을 위해 전체 리스트 다시 불러오기도 수행하지만, 즉각적인 반응을 위해 캐시 업데이트 시도
+                
+                queryClient.setQueryData(["speech", speechId], (oldData) => {
+                    if (!oldData || !oldData.scripts) return oldData;
 
-                        // deep copy needed for immutability
-                        const newScripts = oldData.scripts.map(script => ({
-                            ...script,
-                            segments: script.segments.map(seg => {
-                               if (seg.segment_id === currentSegment.segment_id) {
-                                    // 백엔드 응답이 전체 세그먼트인지, 일부 필드인지에 따라 병합
-                                    const newSegmentData = {
-                                        ...seg,
-                                        ...response, // 응답 데이터로 덮어쓰기 (feedback, metrics 등)
-                                        user_audio_db_list: response.dB_list || [], // 재녹음 dB 리스트를 별도 필드로 저장
-                                    };
-                                    return newSegmentData;
-                               }
-                               return seg;
-                            })
-                        }));
+                    const newScripts = oldData.scripts.map(script => ({
+                        ...script,
+                        segments: script.segments.map(seg => {
+                           if (seg.segment_id === currentSegment.segment_id) {
+                                // 기존 버전 리스트에 새 응답(버전) 추가
+                                // response가 버전 객체라고 가정하고 처리. 
+                                // 만약 response가 단순 데이터라면 구조를 맞춰주거나, refetch에 의존해야 함.
+                                // 가장 확실한 건 refetch()이므로 여기서는 낙관적으로 versions 배열에 추가해봄.
+                                const newVersion = {
+                                    ...response,
+                                    // id나 version_no가 없으면 임시 생성 (refetch되면 해결됨)
+                                    id: response.id || Date.now(),
+                                    version_no: (seg.versions?.length || 0) + 1
+                                };
+                                
+                                const updatedVersions = [...(seg.versions || []), newVersion];
 
-                        return { ...oldData, scripts: newScripts };
-                    });
+                                return {
+                                    ...seg,
+                                    versions: updatedVersions,
+                                    // 최신 버전 정보로 세그먼트 루트 정보도 일부 갱신 가능 (필요 시)
+                                };
+                           }
+                           return seg;
+                        })
+                    }));
 
-                    alert("재녹음 완료!");
+                    return { ...oldData, scripts: newScripts };
+                });
+                
+                // 데이터 정합성을 위해 서버에서 다시 받아옴
+                refetch(); 
+
+                alert("재녹음 완료!");
                 }, 500);
 
             } catch (error) {
@@ -421,7 +437,7 @@ const SpeechDetailPage = () => {
 
   // 화면에 표시할 데이터 (버전 선택에 따라 변경)
   const displayMetrics = activeVersion?.metrics || currentSegment?.metrics;
-  const displayFeedback = activeVersion?.feedback || currentSegment?.feedback;
+  const displayFeedback = activeVersion ? activeVersion.feedback : currentSegment?.feedback;
   // 빨간 그래프 데이터 소스: 녹음 중이면 실시간 데이터, 아니면 선택된 버전의 데이터 (원본 선택 시 빈 배열)
   const displayRedDbList = activeVersion?.dB_list || []; 
   // 만약 "녹음 완료 후 저장된 데이터"가 방금 녹음한 것이라면? 
