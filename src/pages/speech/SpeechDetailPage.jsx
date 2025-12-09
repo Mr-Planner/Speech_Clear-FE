@@ -57,7 +57,9 @@ const SpeechDetailPage = () => {
   const streamRef = useRef(null); // 스트림을 미리 로드하여 보관
   const isWaitingForVoiceRef = useRef(false); // interval 내에서 최신 상태 참조용
   const audioChunksRef = useRef([]);
+
   const audioContextRef = useRef(null);
+  const [selectedVersions, setSelectedVersions] = useState({}); // 각 세그먼트별 선택된 버전 관리 {segmentId: versionIndex}
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
   const intervalRef = useRef(null);
@@ -111,10 +113,11 @@ const SpeechDetailPage = () => {
     }
 
     setRecordingDbList([]);
-    // 세그먼트 변경 시, 가장 최신 버전(마지막 버전)으로 자동 선택
-    // 버전이 없으면(length 0) -1 (원본)이 됨
+    // 세그먼트 변경 시, 저장된 선택 버전이 있으면 복원, 없으면 최신 버전
+    const savedIndex = selectedVersions[currentSegment?.segment_id];
+    // savedIndex가 있으면 사용, 없으면(undefined) 최신 버전(length-1) 사용
     const maxIndex = (currentSegment?.versions?.length || 0) - 1;
-    setActiveVersionIndex(maxIndex);
+    setActiveVersionIndex(savedIndex !== undefined ? savedIndex : maxIndex);
     setIsWaitingForVoice(false);
     isWaitingForVoiceRef.current = false;
   }, [currentSegmentIndex, currentSegment]); // currentSegment dependency added to detect version updates
@@ -572,11 +575,25 @@ const SpeechDetailPage = () => {
   const getAudioUrlForSegment = (segment, isCurrentSegment = false) => {
       if (!segment) return null;
 
+      // 1. 현재 보고 있는 세그먼트라면 activeVersionIndex 사용
       if (isCurrentSegment && currentSegment?.segment_id === segment.segment_id && activeVersionIndex >= 0) {
            const activeVer = segment.versions ? segment.versions[activeVersionIndex] : null;
            if (activeVer) return activeVer.segment_url;
       } 
       
+      // 2. 저장된 선택 버전이 있는지 확인
+      const savedIndex = selectedVersions[segment.segment_id];
+      if (savedIndex !== undefined) {
+          if (savedIndex === -1) {
+              return segment.segment_url;
+          }
+          if (savedIndex >= 0) {
+              const savedVer = segment.versions ? segment.versions[savedIndex] : null;
+              if (savedVer) return savedVer.segment_url;
+          }
+      }
+      
+      // 3. 없으면 최신 버전 사용
       const versions = segment.versions || [];
       if (versions.length > 0) {
            return versions[versions.length - 1].segment_url;
@@ -783,6 +800,14 @@ const SpeechDetailPage = () => {
                                   const nextIdx = Math.max(-1, activeVersionIndex - 1);
                                   setActiveVersionIndex(nextIdx);
                                   
+                                  // 선택 상태 저장
+                                  if (currentSegment) {
+                                      setSelectedVersions(prev => ({
+                                          ...prev,
+                                          [currentSegment.segment_id]: nextIdx
+                                      }));
+                                  }
+
                                   const url = nextIdx === -1 
                                       ? currentSegment.segment_url 
                                       : (currentSegment.versions && currentSegment.versions[nextIdx] ? currentSegment.versions[nextIdx].segment_url : null);
@@ -804,6 +829,14 @@ const SpeechDetailPage = () => {
                                   const maxIdx = (currentSegment?.versions?.length || 0) - 1;
                                   const nextIdx = Math.min(maxIdx, activeVersionIndex + 1);
                                   setActiveVersionIndex(nextIdx);
+
+                                  // 선택 상태 저장
+                                  if (currentSegment) {
+                                      setSelectedVersions(prev => ({
+                                          ...prev,
+                                          [currentSegment.segment_id]: nextIdx
+                                      }));
+                                  }
 
                                   const url = nextIdx === -1 
                                       ? currentSegment.segment_url 
