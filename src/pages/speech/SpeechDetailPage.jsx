@@ -18,7 +18,9 @@ import { Line } from 'react-chartjs-2';
 import { FaStop } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaMicrophone } from "react-icons/fa6";
 import { useNavigate, useParams } from "react-router-dom";
-import { fetchSpeechDetail, reRecordSegment } from "../../service/speechApi"; // reRecordSegment 추가
+import ReRecordProgressModal from "../../components/ReRecordProgressModal";
+import { BASE_URL, fetchSpeechDetail, reRecordSegment } from "../../service/speechApi"; // reRecordSegment 추가
+import { useAuthStore } from '../../store/auth/authStore';
 
 // Chart.js 등록
 ChartJS.register(
@@ -41,12 +43,15 @@ const SpeechDetailPage = () => {
   const queryClient = useQueryClient(); // 클라이언트 초기화
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
   const audioRef = useRef(null); // 오디오 객체 관리
+  const userId = useAuthStore((state) => state.userId); // userId 가져오기
 
   // 재녹음 관련 상태 및 ref
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDbList, setRecordingDbList] = useState([]);
   const [activeVersionIndex, setActiveVersionIndex] = useState(-1); // -1: 원본, 0+: 재녹음 버전
   const [countdown, setCountdown] = useState(null); // 카운트다운 상태 추가
+  const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행률 상태 추가
+  const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const audioContextRef = useRef(null);
@@ -222,6 +227,10 @@ const SpeechDetailPage = () => {
     mediaRecorderRef.current.stop();
     stopRecordingResources();
     setIsRecording(false);
+    
+    // UI 즉시 반응을 위해 처리 중 상태 표시
+    setIsProcessing(true);
+    setUploadProgress(10); // 초기 진입 시 10%
 
     // 잠시 대기 후 마지막 데이터 처리
     setTimeout(async () => {
@@ -233,41 +242,79 @@ const SpeechDetailPage = () => {
         formData.append('db_list', JSON.stringify(recordingDbList)); // 그래프 데이터 전송 (백엔드 저장용)
 
         if (currentSegment?.segment_id) {
+            let eventSource = null;
             try {
+                // 1. SSE 연결 설정
+                if (userId) {
+                    eventSource = new EventSource(`${BASE_URL}/voice/progress/${userId}`);
+                    
+                    eventSource.onopen = () => {
+                        console.log("SSE Connection Opened");
+                    };
+
+                    eventSource.onmessage = (event) => {
+                        const progress = parseInt(event.data, 10);
+                        if (!isNaN(progress)) {
+                            console.log("SSE Progress:", progress);
+                            setUploadProgress(Math.max(10, progress)); // 최소 10% 유지
+                            if (progress === 100) {
+                                eventSource.close();
+                            }
+                        }
+                    };
+
+                    eventSource.onerror = (err) => {
+                        console.error("SSE Error:", err);
+                        eventSource.close();
+                    };
+                }
+
+                // 2. 재녹음 요청 전송 (진행률은 SSE로 받음)
                 const response = await reRecordSegment(currentSegment.segment_id, formData);
                 console.log("Re-record response:", response); // 응답 데이터 확인
 
-                // 응답으로 받은 데이터(새로운 피드백 등)를 즉시 화면에 반영 (낙관적 업데이트 유사 방식)
-                queryClient.setQueryData(["speech", speechId], (oldData) => {
-                    if (!oldData || !oldData.scripts) return oldData;
+                // 3. 완료 처리 (SSE가 100%를 보장하지 못할 경우를 대비해 강제 100%)
+                setUploadProgress(100);
+                if (eventSource) eventSource.close();
 
-                    // deep copy needed for immutability
-                    const newScripts = oldData.scripts.map(script => ({
-                        ...script,
-                        segments: script.segments.map(seg => {
-                           if (seg.segment_id === currentSegment.segment_id) {
-                                // 백엔드 응답이 전체 세그먼트인지, 일부 필드인지에 따라 병합
-                                // user said response.data.feedback exists.
-                                // response included 'dB_list' according to spec image.
-                                // We map this to 'user_audio_db_list' to distinguish from original 'dB_list'
-                                const newSegmentData = {
-                                    ...seg,
-                                    ...response, // 응답 데이터로 덮어쓰기 (feedback, metrics 등)
-                                    user_audio_db_list: response.dB_list || [], // 재녹음 dB 리스트를 별도 필드로 저장
-                                };
-                                return newSegmentData;
-                           }
-                           return seg;
-                        })
-                    }));
+                // 4. 데이터 반영 (약간의 지연 후 모달 닫기)
+                setTimeout(() => {
+                    setIsProcessing(false);
+                    setUploadProgress(0);
 
-                    return { ...oldData, scripts: newScripts };
-                });
+                    // 응답으로 받은 데이터(새로운 피드백 등)를 즉시 화면에 반영 (낙관적 업데이트 유사 방식)
+                    queryClient.setQueryData(["speech", speechId], (oldData) => {
+                        if (!oldData || !oldData.scripts) return oldData;
 
-                alert("재녹음 완료!");
-                // refetch(); // 혹시 모르니 백그라운드에서 전체 갱신도 수행 (선택)
+                        // deep copy needed for immutability
+                        const newScripts = oldData.scripts.map(script => ({
+                            ...script,
+                            segments: script.segments.map(seg => {
+                               if (seg.segment_id === currentSegment.segment_id) {
+                                    // 백엔드 응답이 전체 세그먼트인지, 일부 필드인지에 따라 병합
+                                    const newSegmentData = {
+                                        ...seg,
+                                        ...response, // 응답 데이터로 덮어쓰기 (feedback, metrics 등)
+                                        user_audio_db_list: response.dB_list || [], // 재녹음 dB 리스트를 별도 필드로 저장
+                                    };
+                                    return newSegmentData;
+                               }
+                               return seg;
+                            })
+                        }));
+
+                        return { ...oldData, scripts: newScripts };
+                    });
+
+                    alert("재녹음 완료!");
+                }, 500);
+
             } catch (error) {
                 console.error("Re-recording failed:", error);
+                
+                if (eventSource) eventSource.close();
+                setIsProcessing(false);
+                setUploadProgress(0);
                 alert("재녹음 저장 실패");
             }
         }
@@ -674,6 +721,13 @@ const SpeechDetailPage = () => {
 
         </section>
       </main>
+
+      {/* Re-record Progress Modal */}
+      <ReRecordProgressModal 
+        isOpen={isProcessing} 
+        progress={uploadProgress} 
+        onClose={() => setIsProcessing(false)} 
+      />
     </div>
   );
 };
