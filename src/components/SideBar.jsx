@@ -156,7 +156,10 @@ function SideBar({handleToggleSideBar}) {
                 <ul className="flex flex-col gap-2 px-4">
                     <li className="flex flex-col gap-2 ">
                         <div className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 pl-2 pr-0.5">
-                            <div className="flex gap-1.5 items-center">
+                            <div 
+                                className="flex gap-1.5 items-center cursor-pointer hover:bg-gray-200 rounded px-1 py-0.5"
+                                onClick={() => handleNavigation("/")}
+                            >
                                 <img src = {archive}></img>
                                 <span>모든 Speech</span>
                             </div>
@@ -265,7 +268,7 @@ function SideBar({handleToggleSideBar}) {
                                                 className="flex items-center w-full px-0.5 py-1 min-h-8 cursor-pointer hover:bg-gray-200"
                                                 onClick={() => {
                                                     if (!isRenaming && !isMenuOpen) {
-                                                        navigate(`/speech/${folder.id}`); // 폴더 이동 
+                                                        navigate(`/${folder.id}`); // 폴더 이동 
                                                     }
                                                 }}
                                                 >
@@ -321,7 +324,7 @@ function SideBar({handleToggleSideBar}) {
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
                         <div 
                             className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" 
-                            onClick={() => handleNavigation("/speech/trash")}
+                            onClick={() => handleNavigation("/trash")}
                         >
                             <img src={trash} alt = "휴지통"/>
                             <span>휴지통</span>
@@ -334,7 +337,7 @@ function SideBar({handleToggleSideBar}) {
                 <ul className="px-4 absolute bottom-5 left-0 w-full">
                     <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
                         <div
-                            onClick={() => handleNavigation("/settings")}
+                            onClick={() => handleNavigation("/setting")}
                             className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer"
                         >
                             <img src={setting} alt="설정" />
