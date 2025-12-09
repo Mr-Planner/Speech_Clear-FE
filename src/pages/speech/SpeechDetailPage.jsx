@@ -61,6 +61,9 @@ const SpeechDetailPage = () => {
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
   const intervalRef = useRef(null);
+  const isAutoPlayingRef = useRef(false); // 연속 재생 중인지 추적
+
+
 
   const { data: speech, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["speech", speechId],
@@ -93,9 +96,20 @@ const SpeechDetailPage = () => {
   }, []);
 
   // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
+  // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
   useEffect(() => {
     setIsRecording(false);
-    stopRecordingResources();
+    
+    if (isAutoPlayingRef.current) {
+        // 연속 재생으로 인한 변경인 경우: 오디오를 끄지 않음 (방금 재생 시작한 오디오가 있을 수 있음)
+        // 단, 녹음 관련 리소스는 정리
+        stopRecordingResources(false);
+        isAutoPlayingRef.current = false;
+    } else {
+        // 수동 이동의 경우: 모든 리소스(오디오 포함) 정리
+        stopRecordingResources(true);
+    }
+
     setRecordingDbList([]);
     // 세그먼트 변경 시, 가장 최신 버전(마지막 버전)으로 자동 선택
     // 버전이 없으면(length 0) -1 (원본)이 됨
@@ -114,7 +128,7 @@ const SpeechDetailPage = () => {
     // 단, "재녹음 성공 -> 데이터 생김" 케이스를 위해 여기서는 set만 수행
   }, [currentSegment?.user_audio_db_list]); 
 
-  const stopRecordingResources = () => {
+  const stopRecordingResources = (shouldStopAudio = true) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (audioContextRef.current) {
         audioContextRef.current.close().catch(e => console.error(e));
@@ -129,6 +143,11 @@ const SpeechDetailPage = () => {
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
+    }
+    // 오디오 재생 중이면 중지
+    if (shouldStopAudio && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
     }
     setIsWaitingForVoice(false);
     isWaitingForVoiceRef.current = false;
@@ -383,50 +402,7 @@ const SpeechDetailPage = () => {
     }, 500);
   };
 
-  const playAudio = async (url) => {
-    console.log("Attempting to play audio:", url);
 
-    if (!url) {
-      console.error("Audio URL is missing");
-      return;
-    }
-
-    // 기존 오디오 정지
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-
-    try {
-      // 1. fetch로 데이터 가져오기 (CORS 및 포맷 확인용)
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Network response was not ok: ${response.status}`);
-      }
-
-      // 2. Blob으로 변환
-      const blob = await response.blob();
-      console.log("Audio Blob type:", blob.type); // 서버가 주는 타입 확인
-
-      // 3. 타입이 없거나 이상하면 강제로 wav로 설정해보기 (필요시)
-      // const audioBlob = new Blob([blob], { type: 'audio/wav' }); 
-      
-      // 4. Blob URL 생성
-      const audioUrl = URL.createObjectURL(blob);
-      
-      // 5. 재생
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      
-      await audio.play();
-      console.log("Audio playing successfully");
-
-    } catch (err) {
-      console.error("Audio play failed:", err);
-      alert("오디오 재생 실패: " + err.message);
-    }
-  };
 
 
 
@@ -588,6 +564,66 @@ const SpeechDetailPage = () => {
     }
   };
 
+
+
+  // --- 오디오 관련 헬퍼 함수 ---
+
+  // 세그먼트에 대한 재생 URL 결정 로직 (재녹음 버전 우선)
+  const getAudioUrlForSegment = (segment, isCurrentSegment = false) => {
+      if (!segment) return null;
+
+      if (isCurrentSegment && currentSegment?.segment_id === segment.segment_id && activeVersionIndex >= 0) {
+           const activeVer = segment.versions ? segment.versions[activeVersionIndex] : null;
+           if (activeVer) return activeVer.segment_url;
+      } 
+      
+      const versions = segment.versions || [];
+      if (versions.length > 0) {
+           return versions[versions.length - 1].segment_url;
+      }
+      return segment.segment_url;
+  };
+
+  const playAudio = (url, playingIndex) => {
+    if (!url) return;
+    
+    // 기존 재생 중지
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+    }
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    // 연속 재생 로직
+    if (typeof playingIndex === 'number') {
+        audio.onended = () => {
+            playNextSegment(playingIndex + 1);
+        };
+    }
+
+    audio.play().catch(e => console.error("Audio playback error:", e));
+  };
+
+  const playNextSegment = (nextIndex) => {
+      if (nextIndex >= 0 && nextIndex < allSegments.length) {
+
+          // 자동 재생 플래그 설정 -> useEffect에서 오디오 정지 방지
+          isAutoPlayingRef.current = true;
+          
+          const nextSeg = allSegments[nextIndex];
+          // 다음 세그먼트로 이동 (UI 업데이트)
+          setCurrentSegmentIndex(nextIndex);
+          
+          // 다음 세그먼트의 오디오 URL 결정 (최신 버전 우선)
+          const nextUrl = getAudioUrlForSegment(nextSeg); // isCurrentSegment=false
+          
+          // 재생 (재귀적 호출 구조가 됨)
+          playAudio(nextUrl, nextIndex);
+      }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
@@ -641,8 +677,35 @@ const SpeechDetailPage = () => {
                             // 해당 세그먼트의 인덱스를 찾아서 이동
                             const idx = segments.findIndex(s => s.segment_id === seg.segment_id);
                             if (idx !== -1) {
+                              // 수동 클릭 시에도 useEffect에 의한 오디오 정지를 방지
+                              isAutoPlayingRef.current = true;
                               setCurrentSegmentIndex(idx);
-                              playAudio(seg.segment_url); // 오디오 재생
+                              
+                              let urlToPlay = seg.segment_url; // Default fallback
+
+                              // 현재 선택된 세그먼트를 다시 클릭한 경우: 현재 활성화된 버전 확인
+                              const isCurrent = currentSegment?.segment_id === seg.segment_id;
+                              
+                              // Helper 함수 사용하여 URL 결정
+                              // 클릭 시점의 activeVersionIndex를 반영하기 위해 
+                              // 만약 index가 변경된다면 effect에 의해 activeVersionIndex가 max로 리셋되지만,
+                              // "다시 클릭"의 경우 현재 상태 유지.
+                              // "다른 문장 클릭"의 경우 effect가 아직 안 돌았으므로 activeVersionIndex는 이전 값임. 
+                              // 따라서 getAudioUrlForSegment 내부 로직 보다는 명시적으로 여기서 처리하는 게 안전할 수 있음.
+                              
+                              if (isCurrent) {
+                                  // 현재 보고 있는 버전 재생
+                                   const activeVer = activeVersionIndex >= 0 && seg.versions ? seg.versions[activeVersionIndex] : null;
+                                   urlToPlay = activeVer ? activeVer.segment_url : seg.segment_url;
+                              } else {
+                                  // 다른 문장 -> 최신 버전 (useEffect와 동일한 로직)
+                                   const versions = seg.versions || [];
+                                   if (versions.length > 0) {
+                                       urlToPlay = versions[versions.length - 1].segment_url;
+                                   }
+                              }
+
+                              playAudio(urlToPlay, idx); // idx 전달하여 연속 재생 활성화
                             }
                         }}
                       >
@@ -797,5 +860,7 @@ const SpeechDetailPage = () => {
     </div>
   );
 };
+
+
 
 export default SpeechDetailPage;
