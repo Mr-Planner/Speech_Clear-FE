@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from 'react-chartjs-2';
 import { FaStop } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaMicrophone } from "react-icons/fa6";
@@ -45,6 +45,7 @@ const SpeechDetailPage = () => {
   // 재녹음 관련 상태 및 ref
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDbList, setRecordingDbList] = useState([]);
+  const [activeVersionIndex, setActiveVersionIndex] = useState(-1); // -1: 원본, 0+: 재녹음 버전
   const [countdown, setCountdown] = useState(null); // 카운트다운 상태 추가
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -59,6 +60,20 @@ const SpeechDetailPage = () => {
     enabled: !!speechId,
   });
 
+  // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
+  // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
+  // Hooks 규칙 준수를 위해 Early Return 이전에 계산 (데이터 없으면 빈 배열)
+  const allSegments = useMemo(() => (speech?.scripts || []).flatMap(script => 
+    (script.segments || []).map(seg => ({
+      ...seg,
+      part: script.part // part 정보도 세그먼트에 포함시킴
+    }))
+  ), [speech]);
+
+  const segments = allSegments; 
+  const currentSegment = segments[currentSegmentIndex];
+  const totalSegments = segments.length;
+
   // 컴포넌트 언마운트 시 오디오 및 녹음 정지
   useEffect(() => {
     return () => {
@@ -69,6 +84,27 @@ const SpeechDetailPage = () => {
       stopRecordingResources();
     };
   }, []);
+
+  // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
+  // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
+  useEffect(() => {
+    setIsRecording(false);
+    stopRecordingResources();
+    setRecordingDbList([]);
+    // 세그먼트 변경 시, 가장 최신 버전(마지막 버전)으로 자동 선택
+    // 버전이 없으면(length 0) -1 (원본)이 됨
+    const maxIndex = (currentSegment?.versions?.length || 0) - 1;
+    setActiveVersionIndex(maxIndex);
+  }, [currentSegmentIndex, currentSegment]); // currentSegment dependency added to detect version updates
+
+  // 서버에서 받아온 재녹음 dB 데이터가 있으면 로드 (데이터 업데이트 시 반영)
+  useEffect(() => {
+    if (currentSegment?.user_audio_db_list && Array.isArray(currentSegment.user_audio_db_list)) {
+        setRecordingDbList(currentSegment.user_audio_db_list);
+    }
+    // 데이터가 없으면? 위 effect에서 이미 초기화했으므로 굳이 여기서 초기화 안해도 됨.
+    // 단, "재녹음 성공 -> 데이터 생김" 케이스를 위해 여기서는 set만 수행
+  }, [currentSegment?.user_audio_db_list]); 
 
   const stopRecordingResources = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -98,7 +134,6 @@ const SpeechDetailPage = () => {
         setCountdown(count);
       } else {
         clearInterval(countInterval);
-        setCountdown(null);
         startRecording(); // 카운트다운 종료 후 녹음 시작
       }
     }, 1000);
@@ -127,6 +162,7 @@ const SpeechDetailPage = () => {
 
         mediaRecorder.start();
         setIsRecording(true);
+        setCountdown(null); // 녹음 상태가 된 후 카운트다운 해제 (UI 깜빡임 방지)
         setRecordingDbList([]); // 초기화
 
         // 2. AudioContext 설정 (실시간 dB 분석용)
@@ -142,27 +178,40 @@ const SpeechDetailPage = () => {
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        // 0.1초마다 dB 계산
+        // 0.1초마다 dB 계산 (librosa 방식과 유사하게 RMS -> dB 변환)
         intervalRef.current = setInterval(() => {
-            analyser.getByteFrequencyData(dataArray);
+            // 1. Time Domain Data (Waveform) 가져오기: 0 ~ 255 사이 값 (128이 0(무음))
+            analyser.getByteTimeDomainData(dataArray);
             
-            // 간단한 dB 계산 (평균 진폭을 이용)
-            let sum = 0;
+            // 2. RMS (Root Mean Square) 계산
+            let sumSquares = 0;
             for(let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
+                // 8bit 정수를 -1.0 ~ 1.0 범위의 float로 정규화
+                const normalized = (dataArray[i] - 128) / 128;
+                sumSquares += normalized * normalized;
             }
-            const average = sum / dataArray.length;
+            const rms = Math.sqrt(sumSquares / dataArray.length);
             
-            // 정규화된 dB 값으로 변환 (대략적인 매핑, 필요에 따라 조정)
-            // 보통 0~255 값을 -60~0 dB 혹은 적절한 양수 범위로 매핑
-            // 여기서는 시각화를 위해 적당한 값으로 변환
-            const db = (average / 255) * 100 - 60; // 예시: -60 ~ 40 dB 범위
+            // 3. dB 계산: 20 * log10(rms) (ref=1.0 기준)
+            let db;
+            if (rms > 0) {
+                db = 20 * Math.log10(rms);
+            } else {
+                db = -80; // 무음 처리 (최소값)
+            }
+            
+            // 시각화를 위해 너무 낮은 값은 -80(혹은 -60) 정도로 제한
+            // librosa에서도 보통 최소 dB를 설정함 (top_db 등)
+            // 여기서는 그래프 가독성을 위해 -60 이하를 -60으로 취급하거나 그대로 둘 수 있음.
+            // 일단 계산된 값을 그대로 저장하되, -80 밑으로 내려가면 -80으로 고정
+            db = Math.max(db, -80);
 
             setRecordingDbList(prev => [...prev, db]);
         }, 100);
 
     } catch (err) {
         console.error("Error accessing microphone:", err);
+        setCountdown(null); // 에러 발생 시 초기화
         alert("마이크 접근 권한이 필요합니다.");
     }
   };
@@ -181,6 +230,7 @@ const SpeechDetailPage = () => {
         // 서버로 전송
         const formData = new FormData();
         formData.append('file', audioBlob);
+        formData.append('db_list', JSON.stringify(recordingDbList)); // 그래프 데이터 전송 (백엔드 저장용)
 
         if (currentSegment?.segment_id) {
             try {
@@ -196,15 +246,16 @@ const SpeechDetailPage = () => {
                         ...script,
                         segments: script.segments.map(seg => {
                            if (seg.segment_id === currentSegment.segment_id) {
-                               // 백엔드 응답이 전체 세그먼트인지, 일부 필드인지에 따라 병합
-                               // user said response.data.feedback exists.
-                               // assuming response might be the segment or contains fields to merge.
-                               return { 
-                                   ...seg, 
-                                   ...response, // 응답 데이터로 덮어쓰기 (feedback, metrics 등)
-                                   // 만약 response가 { feedback: "..." } 형태라면 기존 데이터 유지하면서 업데이트됨
-                                   // 만약 response가 data: { ... } 형태라면 response.data를 써야할 수도 있음 (speechApi.js에서 이미 res.data 리턴함)
-                               };
+                                // 백엔드 응답이 전체 세그먼트인지, 일부 필드인지에 따라 병합
+                                // user said response.data.feedback exists.
+                                // response included 'dB_list' according to spec image.
+                                // We map this to 'user_audio_db_list' to distinguish from original 'dB_list'
+                                const newSegmentData = {
+                                    ...seg,
+                                    ...response, // 응답 데이터로 덮어쓰기 (feedback, metrics 등)
+                                    user_audio_db_list: response.dB_list || [], // 재녹음 dB 리스트를 별도 필드로 저장
+                                };
+                                return newSegmentData;
                            }
                            return seg;
                         })
@@ -280,30 +331,13 @@ const SpeechDetailPage = () => {
   //   }
   // }, [speech]);
 
-  // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화
-  useEffect(() => {
-    setRecordingDbList([]);
-    setIsRecording(false);
-    stopRecordingResources();
-  }, [currentSegmentIndex]);
+
 
   if (isLoading) return <div className="p-8">로딩 중...</div>;
   if (isError) return <div className="p-8 text-red-500">에러 발생: {error.message}</div>;
   if (!speech) return <div className="p-8">데이터가 없습니다.</div>;
 
-  // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
-  const allSegments = (speech.scripts || []).flatMap(script => 
-    (script.segments || []).map(seg => ({
-      ...seg,
-      part: script.part // part 정보도 세그먼트에 포함시킴
-    }))
-  );
 
-  // order_no가 있으면 정렬, 없으면 그대로 (현재 JSON에는 order_no가 없음, 필요시 추가 요청하거나 인덱스 사용)
-  // JSON 예시에는 segment_id가 있으므로 이를 키로 사용
-  const segments = allSegments; 
-  const currentSegment = segments[currentSegmentIndex];
-  const totalSegments = segments.length;
 
   console.log("Current Segment:", currentSegment); // 디버깅: 세그먼트 데이터 확인 (start 값 등)
 
@@ -314,6 +348,8 @@ const SpeechDetailPage = () => {
   const handleNext = () => {
     if (currentSegmentIndex < totalSegments - 1) setCurrentSegmentIndex(prev => prev + 1);
   };
+
+
 
   // 날짜 포맷 (voice_created_at)
   // 서버에서 UTC로 주는데 'Z'가 없어서 로컬로 인식되는 문제 해결을 위해 .utc()로 파싱 후 .local()로 변환
@@ -331,14 +367,25 @@ const SpeechDetailPage = () => {
   const dBList = currentSegment?.dB_list || [];
   const startTime = currentSegment?.start || 0;
   const endTime = currentSegment?.end || 0;
-  const originalDuration = endTime - startTime;
   
+  // 버전 데이터 처리
+  const versions = currentSegment?.versions || [];
+  const activeVersion = activeVersionIndex >= 0 ? versions[activeVersionIndex] : null;
+
+  // 화면에 표시할 데이터 (버전 선택에 따라 변경)
+  const displayMetrics = activeVersion?.metrics || currentSegment?.metrics;
+  const displayFeedback = activeVersion?.feedback || currentSegment?.feedback;
+  // 빨간 그래프 데이터 소스: 녹음 중이면 실시간 데이터, 아니면 선택된 버전의 데이터 (원본 선택 시 빈 배열)
+  const displayRedDbList = activeVersion?.dB_list || []; 
+  // 만약 "녹음 완료 후 저장된 데이터"가 방금 녹음한 것이라면? 
+  // stopRecording에서 queryClient 업데이트 시 versions에 추가하므로 displayRedDbList에 반영됨.
+
   // 원본 데이터 interval (고정 0.1초 사용 - 메타데이터 시간과 데이터 포인트 불일치 방지)
   const originalInterval = 0.1;
 
   // 그래프의 지속 시간 계산 (데이터 포인트 개수 기반)
   const originalDataDuration = dBList.length * 0.1;
-  const recordingDataDuration = recordingDbList.length * 0.1;
+  const recordingDataDuration = (isRecording ? recordingDbList : displayRedDbList).length * 0.1;
   
   // 그래프 X축 최대 길이 설정
   const displayDuration = Math.max(originalDataDuration, recordingDataDuration);
@@ -361,7 +408,7 @@ const SpeechDetailPage = () => {
       },
       {
         label: 'Recording dB',
-        data: recordingDbList.map((val, i) => ({ x: i * 0.1, y: val })), // 0.1초 간격 매핑
+        data: (isRecording ? recordingDbList : displayRedDbList).map((val, i) => ({ x: i * 0.1, y: val })), // 0.1초 간격 매핑
         borderColor: '#EF4444', // 빨간색 (녹음)
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.4,
@@ -537,27 +584,57 @@ const SpeechDetailPage = () => {
               </div>
 
               {/* Metrics */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-                  <p className="text-sm text-gray-500 mb-1">목소리 크기</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    {currentSegment.metrics?.dB ? Number(currentSegment.metrics.dB).toFixed(2) : 0} 
-                    <span className="text-sm font-normal">dB</span>
-                  </p>
+              {/* Version Navigation & Metrics */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-lg font-bold text-gray-900">
+                         {activeVersionIndex === -1 ? "원본 분석 결과" : `재녹음 #${activeVersionIndex + 1} 결과`}
+                     </h3>
+                     <div className="flex items-center gap-2">
+                         <button
+                             onClick={() => setActiveVersionIndex(prev => Math.max(-1, prev - 1))}
+                             disabled={activeVersionIndex === -1}
+                             className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                         >
+                             <FaChevronLeft size={16} />
+                         </button>
+                         
+                         <span className="text-sm text-gray-500 font-medium w-16 text-center">
+                             {activeVersionIndex === -1 ? "Original" : `Ver.${activeVersionIndex + 1}`}
+                         </span>
+                         
+                         <button
+                             onClick={() => setActiveVersionIndex(prev => Math.min((currentSegment?.versions?.length || 0) - 1, prev + 1))}
+                             disabled={activeVersionIndex >= (currentSegment?.versions?.length || 0) - 1}
+                             className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                         >
+                             <FaChevronRight size={16} />
+                         </button>
+                     </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-                  <p className="text-sm text-gray-500 mb-1">목소리 높낮이</p>
-                  <p className="text-xl font-bold text-gray-900">
-                     {currentSegment.metrics?.pitch_mean_hz ? Number(currentSegment.metrics.pitch_mean_hz).toFixed(2) : 0}
-                     <span className="text-sm font-normal">Hz</span>
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-                  <p className="text-sm text-gray-500 mb-1">말하기 속도</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    {currentSegment.metrics?.rate_wpm ? Number(currentSegment.metrics.rate_wpm).toFixed(2) : 0}
-                    <span className="text-sm font-normal">WPM</span>
-                  </p>
+
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <p className="text-sm text-gray-500 mb-1">목소리 크기</p>
+                    <p className="text-xl font-bold text-gray-900">
+                        {displayMetrics?.dB ? Number(displayMetrics.dB).toFixed(2) : 0} 
+                        <span className="text-sm font-normal">dB</span>
+                    </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <p className="text-sm text-gray-500 mb-1">목소리 높낮이</p>
+                    <p className="text-xl font-bold text-gray-900">
+                        {displayMetrics?.pitch_mean_hz ? Number(displayMetrics.pitch_mean_hz).toFixed(2) : 0}
+                        <span className="text-sm font-normal">Hz</span>
+                    </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <p className="text-sm text-gray-500 mb-1">말하기 속도</p>
+                    <p className="text-xl font-bold text-gray-900">
+                        {displayMetrics?.rate_wpm ? Number(displayMetrics.rate_wpm).toFixed(2) : 0}
+                        <span className="text-sm font-normal">WPM</span>
+                    </p>
+                    </div>
                 </div>
               </div>
 
@@ -565,7 +642,7 @@ const SpeechDetailPage = () => {
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8 flex-1">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">상세 피드백</h3>
                 <p className="text-gray-700 leading-relaxed">
-                  {currentSegment.feedback || "피드백이 없습니다."}
+                  {displayFeedback || "피드백이 없습니다."}
                 </p>
               </div>
 
