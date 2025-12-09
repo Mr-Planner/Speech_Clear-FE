@@ -16,7 +16,7 @@ import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from 'react-chartjs-2';
 import { FaStop } from "react-icons/fa";
-import { FaChevronLeft, FaChevronRight, FaMicrophone } from "react-icons/fa6";
+import { FaChevronLeft, FaChevronRight, FaMicrophone, FaPlay } from "react-icons/fa6";
 import { useNavigate, useParams } from "react-router-dom";
 import ReRecordProgressModal from "../../components/ReRecordProgressModal";
 import { BASE_URL, fetchSpeechDetail, reRecordSegment } from "../../service/speechApi"; // reRecordSegment 추가
@@ -584,7 +584,7 @@ const SpeechDetailPage = () => {
       return segment.segment_url;
   };
 
-  const playAudio = (url, playingIndex) => {
+  const playAudio = (url, playingIndex, isContinuous = false) => {
     if (!url) return;
     
     // 기존 재생 중지
@@ -597,7 +597,7 @@ const SpeechDetailPage = () => {
     audioRef.current = audio;
 
     // 연속 재생 로직
-    if (typeof playingIndex === 'number') {
+    if (isContinuous && typeof playingIndex === 'number') {
         audio.onended = () => {
             playNextSegment(playingIndex + 1);
         };
@@ -619,8 +619,8 @@ const SpeechDetailPage = () => {
           // 다음 세그먼트의 오디오 URL 결정 (최신 버전 우선)
           const nextUrl = getAudioUrlForSegment(nextSeg); // isCurrentSegment=false
           
-          // 재생 (재귀적 호출 구조가 됨)
-          playAudio(nextUrl, nextIndex);
+          // 재생 (재귀적 호출 구조가 됨, 모드 유지)
+          playAudio(nextUrl, nextIndex, true);
       }
   };
 
@@ -661,6 +661,20 @@ const SpeechDetailPage = () => {
 
           {/* Script Content */}
           <div className="space-y-8">
+            <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-xl font-bold text-gray-800">스크립트</h2>
+                 <button 
+                     onClick={() => {
+                        // 현재 세그먼트부터 연속 재생 시작
+                        const url = getAudioUrlForSegment(currentSegment, true);
+                        playAudio(url, currentSegmentIndex, true);
+                     }}
+                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-bold text-sm transition-colors cursor-pointer"
+                 >
+                     <FaPlay size={12} />
+                     <span>전체 재생</span>
+                 </button>
+            </div>
             {scripts.map((script, scriptIdx) => (
               <div key={scriptIdx}>
                 <h3 className="text-lg font-bold text-gray-800 mb-3">{script.part}</h3>
@@ -705,7 +719,7 @@ const SpeechDetailPage = () => {
                                    }
                               }
 
-                              playAudio(urlToPlay, idx); // idx 전달하여 연속 재생 활성화
+                              playAudio(urlToPlay, idx, false); // idx 전달, isContinuous: false (단건 재생)
                             }
                         }}
                       >
@@ -765,24 +779,43 @@ const SpeechDetailPage = () => {
                      </h3>
                      <div className="flex items-center gap-2">
                          <button
-                             onClick={() => setActiveVersionIndex(prev => Math.max(-1, prev - 1))}
-                             disabled={activeVersionIndex === -1}
-                             className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                         >
-                             <FaChevronLeft size={16} />
-                         </button>
+                              onClick={() => {
+                                  const nextIdx = Math.max(-1, activeVersionIndex - 1);
+                                  setActiveVersionIndex(nextIdx);
+                                  
+                                  const url = nextIdx === -1 
+                                      ? currentSegment.segment_url 
+                                      : (currentSegment.versions && currentSegment.versions[nextIdx] ? currentSegment.versions[nextIdx].segment_url : null);
+                                  
+                                  playAudio(url, currentSegmentIndex, false);
+                              }}
+                              disabled={activeVersionIndex === -1}
+                              className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          >
+                              <FaChevronLeft size={16} />
+                          </button>
                          
                          <span className="text-sm text-gray-500 font-medium w-16 text-center">
                              {activeVersionIndex === -1 ? "Original" : `Ver.${activeVersionIndex + 1}`}
                          </span>
                          
                          <button
-                             onClick={() => setActiveVersionIndex(prev => Math.min((currentSegment?.versions?.length || 0) - 1, prev + 1))}
-                             disabled={activeVersionIndex >= (currentSegment?.versions?.length || 0) - 1}
-                             className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                         >
-                             <FaChevronRight size={16} />
-                         </button>
+                              onClick={() => {
+                                  const maxIdx = (currentSegment?.versions?.length || 0) - 1;
+                                  const nextIdx = Math.min(maxIdx, activeVersionIndex + 1);
+                                  setActiveVersionIndex(nextIdx);
+
+                                  const url = nextIdx === -1 
+                                      ? currentSegment.segment_url 
+                                      : (currentSegment.versions && currentSegment.versions[nextIdx] ? currentSegment.versions[nextIdx].segment_url : null);
+                                  
+                                  playAudio(url, currentSegmentIndex, false);
+                              }}
+                              disabled={activeVersionIndex >= (currentSegment?.versions?.length || 0) - 1}
+                              className="p-1 rounded-full hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          >
+                              <FaChevronRight size={16} />
+                          </button>
                      </div>
                 </div>
 
