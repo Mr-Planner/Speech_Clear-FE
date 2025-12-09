@@ -47,12 +47,15 @@ const SpeechDetailPage = () => {
 
   // 재녹음 관련 상태 및 ref
   const [isRecording, setIsRecording] = useState(false);
+  const [isWaitingForVoice, setIsWaitingForVoice] = useState(false); // VAD 대기 상태
   const [recordingDbList, setRecordingDbList] = useState([]);
   const [activeVersionIndex, setActiveVersionIndex] = useState(-1); // -1: 원본, 0+: 재녹음 버전
   const [countdown, setCountdown] = useState(null); // 카운트다운 상태 추가
   const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행률 상태 추가
   const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null); // 스트림을 미리 로드하여 보관
+  const isWaitingForVoiceRef = useRef(false); // interval 내에서 최신 상태 참조용
   const audioChunksRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -65,7 +68,6 @@ const SpeechDetailPage = () => {
     enabled: !!speechId,
   });
 
-  // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
   // 1. scripts 배열에서 모든 segments를 추출하여 하나의 평탄화된 배열로 만듦 (네비게이션용)
   // Hooks 규칙 준수를 위해 Early Return 이전에 계산 (데이터 없으면 빈 배열)
   const allSegments = useMemo(() => (speech?.scripts || []).flatMap(script => 
@@ -91,7 +93,6 @@ const SpeechDetailPage = () => {
   }, []);
 
   // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
-  // 세그먼트 변경 시 녹음 데이터 및 그래프 초기화 (네비게이션 시)
   useEffect(() => {
     setIsRecording(false);
     stopRecordingResources();
@@ -100,6 +101,8 @@ const SpeechDetailPage = () => {
     // 버전이 없으면(length 0) -1 (원본)이 됨
     const maxIndex = (currentSegment?.versions?.length || 0) - 1;
     setActiveVersionIndex(maxIndex);
+    setIsWaitingForVoice(false);
+    isWaitingForVoiceRef.current = false;
   }, [currentSegmentIndex, currentSegment]); // currentSegment dependency added to detect version updates
 
   // 서버에서 받아온 재녹음 dB 데이터가 있으면 로드 (데이터 업데이트 시 반영)
@@ -113,15 +116,27 @@ const SpeechDetailPage = () => {
 
   const stopRecordingResources = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (audioContextRef.current) audioContextRef.current.close();
+    if (audioContextRef.current) {
+        audioContextRef.current.close().catch(e => console.error(e));
+        audioContextRef.current = null;
+    }
+    // 스트림은 stopRecordingResources에서 완전히 끄지 않고, 
+    // 페이지 나갈때나 완전히 멈출때만 끄도록 관리할 수도 있으나, 
+    // 여기서는 깔끔하게 매번 리셋
+    if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
     }
+    setIsWaitingForVoice(false);
+    isWaitingForVoiceRef.current = false;
   };
 
   // 녹음 버튼 클릭 핸들러 (카운트다운 로직 포함)
-  const handleRecordClick = () => {
-    if (isRecording) {
+  const handleRecordClick = async () => {
+    if (isRecording || isWaitingForVoice) {
       stopRecording();
       return;
     }
@@ -129,26 +144,40 @@ const SpeechDetailPage = () => {
     // 이미 카운트다운 중이면 무시
     if (countdown !== null) return;
 
-    // 카운트다운 시작
-    setCountdown(3);
-    let count = 3;
-    
-    const countInterval = setInterval(() => {
-      count -= 1;
-      if (count > 0) {
-        setCountdown(count);
-      } else {
-        clearInterval(countInterval);
-        startRecording(); // 카운트다운 종료 후 녹음 시작
-      }
-    }, 1000);
+    try {
+        // 1. 스트림 미리 확보 (Latency 제거)
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+
+        // 2. 카운트다운 시작
+        setCountdown(3);
+        let count = 3;
+        
+        const countInterval = setInterval(() => {
+          count -= 1;
+          if (count > 0) {
+            setCountdown(count);
+          } else {
+            clearInterval(countInterval);
+            startStandby(); // 카운트다운 종료 후 대기 상태 진입
+          }
+        }, 1000);
+
+    } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("마이크 접근 권한이 필요합니다.");
+    }
   };
 
-  const startRecording = async () => {
+  const startStandby = async () => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = streamRef.current;
+        if (!stream) {
+            console.error("Stream not found!");
+            return;
+        }
         
-        // 1. MediaRecorder 설정 (녹음 저장용)
+        // 1. MediaRecorder 설정 (녹음 저장용 - 아직 start 안함)
         const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
@@ -161,13 +190,14 @@ const SpeechDetailPage = () => {
 
         mediaRecorder.onstop = async () => {
              // 녹음 중단 시 로직은 handleStopRecording에서 처리
-             const tracks = stream.getTracks();
-             tracks.forEach(track => track.stop());
+             // stream stop은 stopRecordingResources에서 일괄 처리
         };
 
-        mediaRecorder.start();
-        setIsRecording(true);
-        setCountdown(null); // 녹음 상태가 된 후 카운트다운 해제 (UI 깜빡임 방지)
+        setCountdown(null); // 카운트다운 해제
+        
+        // VAD 대기 모드 진입
+        setIsWaitingForVoice(true);
+        isWaitingForVoiceRef.current = true;
         setRecordingDbList([]); // 초기화
 
         // 2. AudioContext 설정 (실시간 dB 분석용)
@@ -183,46 +213,62 @@ const SpeechDetailPage = () => {
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        // 0.1초마다 dB 계산 (librosa 방식과 유사하게 RMS -> dB 변환)
+        // 0.1초마다 dB 계산
         intervalRef.current = setInterval(() => {
-            // 1. Time Domain Data (Waveform) 가져오기: 0 ~ 255 사이 값 (128이 0(무음))
             analyser.getByteTimeDomainData(dataArray);
             
-            // 2. RMS (Root Mean Square) 계산
             let sumSquares = 0;
             for(let i = 0; i < dataArray.length; i++) {
-                // 8bit 정수를 -1.0 ~ 1.0 범위의 float로 정규화
                 const normalized = (dataArray[i] - 128) / 128;
                 sumSquares += normalized * normalized;
             }
             const rms = Math.sqrt(sumSquares / dataArray.length);
             
-            // 3. dB 계산: 20 * log10(rms) (ref=1.0 기준)
             let db;
             if (rms > 0) {
                 db = 20 * Math.log10(rms);
             } else {
-                db = -80; // 무음 처리 (최소값)
+                db = -80; 
             }
-            
-            // 시각화를 위해 너무 낮은 값은 -80(혹은 -60) 정도로 제한
-            // librosa에서도 보통 최소 dB를 설정함 (top_db 등)
-            // 여기서는 그래프 가독성을 위해 -60 이하를 -60으로 취급하거나 그대로 둘 수 있음.
-            // 일단 계산된 값을 그대로 저장하되, -80 밑으로 내려가면 -80으로 고정
             db = Math.max(db, -80);
 
-            setRecordingDbList(prev => [...prev, db]);
+            // VAD 로직: 목소리 임계값 체크
+            if (isWaitingForVoiceRef.current) {
+                // -30dB 이상이면 말하기 시작으로 간주 (기준 상향 조절)
+                if (db > -30) {
+                    console.log("Voice detected! Starting recording...");
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                    setIsWaitingForVoice(false);
+                    isWaitingForVoiceRef.current = false;
+                    // 첫 데이터 포인트 추가
+                    setRecordingDbList(prev => [...prev, db]);
+                }
+                // 대기 중일 때는 그래프 업데이트 안 함 (혹은 작은 값으로 유지)
+            } else {
+                // 녹음 중일 때만 데이터 저장
+                 setRecordingDbList(prev => [...prev, db]);
+            }
+
         }, 100);
 
     } catch (err) {
-        console.error("Error accessing microphone:", err);
-        setCountdown(null); // 에러 발생 시 초기화
-        alert("마이크 접근 권한이 필요합니다.");
+        console.error("Error setting up audio resources:", err);
+        setCountdown(null);
     }
   };
 
   const stopRecording = async () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    // VAD 대기 중이거나 녹음 중일 때 모두 멈출 수 있어야 함
+    if (!mediaRecorderRef.current) return;
+
+    // VAD 대기 중이면 바로 리소스 정리하고 종료
+    if (isWaitingForVoice) {
+        stopRecordingResources();
+        return;
+    }
+
+    if (!isRecording) return; // 녹음 시작 전이면 무시
 
     mediaRecorderRef.current.stop();
     stopRecordingResources();
@@ -480,6 +526,7 @@ const SpeechDetailPage = () => {
         fill: false,
         order: 1,
         yAxisID: 'y', // 명시적으로 y축 지정
+        // VAD 대기 중일 때는 데이터가 없으므로 그려지지 않음 (사용자가 말하기 시작하면 데이터 추가됨)
       },
     ],
   };
@@ -714,7 +761,8 @@ const SpeechDetailPage = () => {
                 <button 
                     onClick={handleRecordClick}
                     className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 cursor-pointer
-                        ${isRecording ? 'bg-gray-800 hover:bg-gray-900' : 'bg-red-500 hover:bg-red-600'}
+                        ${isRecording ? 'bg-gray-800 hover:bg-gray-900' : 
+                          isWaitingForVoice ? 'bg-red-400 animate-pulse' : 'bg-red-500 hover:bg-red-600'}
                         ${countdown !== null ? 'bg-orange-400 hover:bg-orange-500 cursor-not-allowed' : ''}
                     `}
                     disabled={countdown !== null}
@@ -723,6 +771,8 @@ const SpeechDetailPage = () => {
                     <span className="text-2xl font-bold text-white animate-pulse">{countdown}</span>
                   ) : isRecording ? (
                     <FaStop size={24} className="text-white" />
+                  ) : isWaitingForVoice ? (
+                    <span className="text-xs font-bold text-white text-center">말씀<br/>하세요</span>
                   ) : (
                     <FaMicrophone size={24} className="text-white" />
                   )}
