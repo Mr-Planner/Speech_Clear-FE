@@ -84,7 +84,16 @@ const SpeechDetailPage = () => {
 
   const segments = allSegments; 
   const currentSegment = segments[currentSegmentIndex];
-  const totalSegments = segments.length;
+  
+  // 피드백이 있는 유효한 세그먼트만 필터링 (네비게이션 및 카운트용)
+  const validSegments = useMemo(() => segments.filter(seg => seg.feedback && seg.feedback.trim() !== ""), [segments]);
+  const totalValidSegments = validSegments.length;
+
+  // 현재 세그먼트의 유효 인덱스 (몇 번째 유효 문장인지)
+  const currentValidIndex = useMemo(() => {
+    if (!currentSegment) return -1;
+    return validSegments.findIndex(s => s.segment_id === currentSegment.segment_id);
+  }, [currentSegment, validSegments]);
 
   // 컴포넌트 언마운트 시 오디오 및 녹음 정지
   useEffect(() => {
@@ -430,11 +439,20 @@ const SpeechDetailPage = () => {
   console.log("Current Segment:", currentSegment); // 디버깅: 세그먼트 데이터 확인 (start 값 등)
 
   // 이전/다음 세그먼트 이동
+  // 이전/다음 세그먼트 이동 (유효 세그먼트 기준)
   const handlePrev = () => {
-    if (currentSegmentIndex > 0) setCurrentSegmentIndex(prev => prev - 1);
+    if (currentValidIndex > 0) {
+        const prevValidSeg = validSegments[currentValidIndex - 1];
+        const originalIndex = segments.findIndex(s => s.segment_id === prevValidSeg.segment_id);
+        if (originalIndex !== -1) setCurrentSegmentIndex(originalIndex);
+    }
   };
   const handleNext = () => {
-    if (currentSegmentIndex < totalSegments - 1) setCurrentSegmentIndex(prev => prev + 1);
+      if (currentValidIndex < totalValidSegments - 1) {
+          const nextValidSeg = validSegments[currentValidIndex + 1];
+          const originalIndex = segments.findIndex(s => s.segment_id === nextValidSeg.segment_id);
+          if (originalIndex !== -1) setCurrentSegmentIndex(originalIndex);
+      }
   };
 
 
@@ -789,21 +807,27 @@ const SpeechDetailPage = () => {
         {/* Right Column: Analysis & Feedback */}
         <section className="w-1/2 flex flex-col p-8 overflow-hidden bg-gray-50">
           
-          {/* Navigation */}
-          <div className="flex items-center justify-between mb-6">
+          {totalValidSegments === 0 ? (
+             <div className="flex items-center justify-center h-full text-gray-500 text-lg font-medium">
+                 피드백이 없습니다.
+             </div>
+          ) : (
+             <>
+                {/* Navigation */}
+                <div className="flex items-center justify-between mb-6">
             <button 
               onClick={handlePrev} 
-              disabled={currentSegmentIndex === 0}
+              disabled={currentValidIndex <= 0}
               className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
               <FaChevronLeft size={20} />
             </button>
             <span className="text-2xl font-bold text-gray-800">
-              {currentSegment?.order_no || currentSegmentIndex + 1} / {totalSegments}
+              {currentValidIndex !== -1 ? currentValidIndex + 1 : "-"} / {totalValidSegments}
             </span>
             <button 
               onClick={handleNext} 
-              disabled={currentSegmentIndex === totalSegments - 1}
+              disabled={currentValidIndex === -1 || currentValidIndex >= totalValidSegments - 1}
               className="p-2 text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
               <FaChevronRight size={20} />
@@ -962,10 +986,12 @@ const SpeechDetailPage = () => {
                           isWaitingForVoice ? 'bg-red-400 animate-pulse' : 'bg-red-500 hover:bg-red-600'}
                         ${countdown !== null ? 'bg-orange-400 hover:bg-orange-500 cursor-not-allowed' : ''}
                     `}
-                    disabled={countdown !== null}
+                    disabled={countdown !== null || !currentSegment?.feedback || currentSegment?.feedback === ""}
                 >
                   {countdown !== null ? (
                     <span className="text-2xl font-bold text-white animate-pulse">{countdown}</span>
+                  ) : (!currentSegment?.feedback || currentSegment?.feedback === "") ? (
+                    <span className="text-xs font-bold text-white text-center">재녹음<br/>불가</span>
                   ) : isRecording ? (
                     <FaStop size={24} className="text-white" />
                   ) : isWaitingForVoice ? (
@@ -981,6 +1007,8 @@ const SpeechDetailPage = () => {
               선택된 문장이 없습니다.
             </div>
           )}
+        </>
+      )}
 
         </section>
       </main>
