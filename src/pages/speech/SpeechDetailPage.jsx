@@ -1,15 +1,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    CategoryScale,
-    Chart as ChartJS,
-    Filler,
-    Legend,
-    LinearScale,
-    LineElement,
-    PointElement,
-    Title,
-    Tooltip
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip
 } from 'chart.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
@@ -454,7 +454,6 @@ const SpeechDetailPage = () => {
   // 그래프 데이터 준비
   const dBList = currentSegment?.dB_list || [];
   const startTime = currentSegment?.start || 0;
-  const endTime = currentSegment?.end || 0;
   
   // 버전 데이터 처리
   const versions = currentSegment?.versions || [];
@@ -465,8 +464,6 @@ const SpeechDetailPage = () => {
   const displayFeedback = activeVersion ? activeVersion.feedback : currentSegment?.feedback;
   // 빨간 그래프 데이터 소스: 녹음 중이면 실시간 데이터, 아니면 선택된 버전의 데이터 (원본 선택 시 빈 배열)
   const displayRedDbList = activeVersion?.dB_list || []; 
-  // 만약 "녹음 완료 후 저장된 데이터"가 방금 녹음한 것이라면? 
-  // stopRecording에서 queryClient 업데이트 시 versions에 추가하므로 displayRedDbList에 반영됨.
 
   // 원본 데이터 interval (고정 0.1초 사용 - 메타데이터 시간과 데이터 포인트 불일치 방지)
   const originalInterval = 0.1;
@@ -478,35 +475,78 @@ const SpeechDetailPage = () => {
   // 그래프 X축 최대 길이 설정
   const displayDuration = Math.max(originalDataDuration, recordingDataDuration);
 
+  // 적정 dB 범위 계산
+  const avgDb = displayMetrics?.dB ? Number(displayMetrics.dB) : null;
+  const upperDbLimit = avgDb !== null ? avgDb + 1.9 : null;
+  const lowerDbLimit = avgDb !== null ? avgDb - 2.5 : null;
+
+  // 범위 표시용 데이터셋 생성 (그래프 전체 길이에 걸쳐 표시)
+  // 데이터 포인트 개수는 적당히 2개(시작, 끝)만 있어도 되지만, 
+  // 다른 라인과 x축을 공유하므로 displayDuration에 맞춰 2점 선분 생성
+  const rangeDataUpper = upperDbLimit !== null ? [
+      { x: 0, y: upperDbLimit },
+      { x: displayDuration, y: upperDbLimit }
+  ] : [];
+  
+  const rangeDataLower = lowerDbLimit !== null ? [
+      { x: 0, y: lowerDbLimit },
+      { x: displayDuration, y: lowerDbLimit }
+  ] : [];
+
+
   // Chart Data 구성 (Linear Scale 사용을 위해 x, y 데이터 변환)
   const chartData = {
     datasets: [
       {
         label: 'Original dB',
-        data: dBList.map((val, i) => ({ x: i * originalInterval, y: val })), // 0.1초 고정 간격 (데이터 왜곡 방지)
+        data: dBList.map((val, i) => ({ x: i * originalInterval, y: val })), // 0.1초 고정 간격
         borderColor: '#7DCC74', // 테마색 (초록)
-        backgroundColor: 'rgba(125, 204, 116, 0.1)', // 배경색 (연한 초록)
-        tension: 0.4, // 부드러운 곡선
-        pointRadius: 0, // 포인트 숨김
-        pointHoverRadius: 4, // 호버 시 포인트 표시
+        backgroundColor: 'rgba(125, 204, 116, 0.1)',
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4,
         borderWidth: 2,
-        fill: true,
-        order: 2,
-        yAxisID: 'y', // 명시적으로 y축 지정
+        fill: false,
+        order: 1, // 가장 앞에
+        yAxisID: 'y',
       },
       {
         label: 'Recording dB',
-        data: (isRecording ? recordingDbList : displayRedDbList).map((val, i) => ({ x: i * 0.1, y: val })), // 0.1초 간격 매핑
-        borderColor: '#EF4444', // 빨간색 (녹음)
+        data: (isRecording ? recordingDbList : displayRedDbList).map((val, i) => ({ x: i * 0.1, y: val })), 
+        borderColor: '#EF4444', // 빨간색
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.4,
         pointRadius: 0,
         borderWidth: 2,
         fill: false,
-        order: 1,
-        yAxisID: 'y', // 명시적으로 y축 지정
-        // VAD 대기 중일 때는 데이터가 없으므로 그려지지 않음 (사용자가 말하기 시작하면 데이터 추가됨)
+        order: 2, 
+        yAxisID: 'y',
       },
+      // 적정 범위 (상한선)
+      {
+        label: 'Optimal Range Upper',
+        data: rangeDataUpper,
+        borderColor: 'rgba(251, 191, 36, 0.8)', // Amber-400
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false, // 채우기는 하한선에서 처리
+        order: 3,
+        yAxisID: 'y',
+      },
+      // 적정 범위 (하한선 + 채우기)
+      {
+        label: 'Optimal Range', // 범례 표시용
+        data: rangeDataLower,
+        borderColor: 'rgba(251, 191, 36, 0.8)', // Amber-400
+        backgroundColor: 'rgba(251, 191, 36, 0.15)', // 연한 Amber 배경
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: '-1', // 바로 이전 데이터셋(Upper)까지 채움
+        order: 4,
+        yAxisID: 'y',
+      }
     ],
   };
 
