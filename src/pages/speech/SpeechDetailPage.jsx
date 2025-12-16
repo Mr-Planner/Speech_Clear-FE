@@ -1,15 +1,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CategoryScale,
-  Chart as ChartJS,
-  Filler,
-  Legend,
-  LinearScale,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip
+    CategoryScale,
+    Chart as ChartJS,
+    Filler,
+    Legend,
+    LinearScale,
+    LineElement,
+    PointElement,
+    Title,
+    Tooltip
 } from 'chart.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // UTC 플러그인 추가
@@ -669,17 +669,12 @@ const SpeechDetailPage = () => {
         {/* Left Column: Script & Info */}
         <section className="w-1/2 border-r border-gray-200 overflow-y-auto p-8">
           
-          {/* Tags */}
-          <div className="flex gap-2 mb-8">
-            <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-bold">#dB</span>
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold">#pitch</span>
-            <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-bold">#wpm</span>
-          </div>
+
 
           {/* Script Content */}
           <div className="space-y-8">
             <div className="flex justify-between items-center mb-4">
-                 <h2 className="text-xl font-bold text-gray-800">스크립트</h2>
+                 <h2 className="text-2xl font-bold text-gray-800">Script</h2>
                  <button 
                      onClick={() => {
                         // 현재 세그먼트부터 연속 재생 시작
@@ -751,7 +746,8 @@ const SpeechDetailPage = () => {
         </section>
 
         {/* Right Column: Analysis & Feedback */}
-        <section className="w-1/2 flex flex-col p-8 overflow-y-auto bg-gray-50">
+        {/* Right Column: Analysis & Feedback */}
+        <section className="w-1/2 flex flex-col p-8 overflow-hidden bg-gray-50">
           
           {/* Navigation */}
           <div className="flex items-center justify-between mb-6">
@@ -878,15 +874,47 @@ const SpeechDetailPage = () => {
               </div>
 
               {/* Feedback */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8 flex-1">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">상세 피드백</h3>
-                <p className="text-gray-700 leading-relaxed">
-                  {displayFeedback || "피드백이 없습니다."}
-                </p>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8 flex-1 flex flex-col max-h-[350px]">
+                {/* Fixed Header */}
+                <div className="px-6 py-4 border-b border-gray-100 flex-none bg-white rounded-t-xl">
+                    <h3 className="text-lg font-bold text-gray-900">상세 피드백</h3>
+                </div>
+                
+                {/* Scrollable Content */}
+                <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                    <div className="text-gray-700 leading-relaxed text-sm">
+                    {(() => {
+                        const text = displayFeedback || "피드백이 없습니다.";
+                        if (!text) return null;
+                        
+                        return text.split('\n').map((line, index) => {
+                        const trimmed = line.trim();
+                        // <제목> 형식 체크
+                        if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+                            // 첫 번째 줄이거나, 이전에 내용이 없었다면 margin-top 제거
+                            const isFirst = index === 0;
+                            
+                            // < > 제거하고 굵게 표시
+                            return (
+                                <h4 key={index} className={`font-bold text-gray-900 mb-2 text-base ${isFirst ? 'mt-0' : 'mt-4'}`}>
+                                    {trimmed.replace(/[<>]/g, '')}
+                                </h4>
+                            );
+                        }
+                        // 빈 줄은 무시하거나 간격으로 처리
+                        if (trimmed === '') {
+                            return <div key={index} className="h-2" />;
+                        }
+                        // 일반 텍스트
+                        return <p key={index} className="mb-1">{line}</p>;
+                        });
+                    })()}
+                    </div>
+                </div>
               </div>
 
               {/* Re-record Button */}
-              <div className="flex justify-center mt-auto">
+              <div className="flex justify-center mt-auto flex-none">
                 <button 
                     onClick={handleRecordClick}
                     className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 cursor-pointer
