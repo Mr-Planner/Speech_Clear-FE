@@ -19,7 +19,7 @@ import { FaStop } from "react-icons/fa";
 import { FaChevronLeft, FaChevronRight, FaMicrophone, FaPlay } from "react-icons/fa6";
 import { useNavigate, useParams } from "react-router-dom";
 import ReRecordProgressModal from "../../components/ReRecordProgressModal";
-import { BASE_URL, fetchSpeechDetail, reRecordSegment } from "../../service/speechApi"; // reRecordSegment 추가
+import { BASE_URL, fetchSpeechDetail, reRecordSegment, submitSpeechSynthesis } from "../../service/speechApi"; // submitSpeechSynthesis 추가
 import { useAuthStore } from '../../store/auth/authStore';
 
 // Chart.js 등록
@@ -414,8 +414,52 @@ const SpeechDetailPage = () => {
     }, 500);
   };
 
+  // 최종 제출 핸들러
+  const handleSubmit = async () => {
+    if (!speech || !speech.scripts) return;
 
+    if (!confirm("현재 선택된 버전으로 최종 제출하시겠습니까?")) return;
 
+    try {
+        const selectionsPayload = {
+            selections: allSegments.map(seg => {
+                // 1. 현재 선택된 버전 인덱스 확인
+                let selectedIdx = selectedVersions[seg.segment_id];
+
+                // 2. 선택된 게 없다면? (기본 로직: 최신 버전 사용, 없으면 원본 -1)
+                if (selectedIdx === undefined) {
+                    const versions = seg.versions || [];
+                    if (versions.length > 0) {
+                        selectedIdx = versions.length - 1; // 최신 버전
+                    } else {
+                        selectedIdx = -1; // 원본
+                    }
+                }
+                
+                return {
+                    segment_id: seg.segment_id,
+                    selected_version_index: selectedIdx
+                };
+            })
+        };
+
+        console.log("Submitting selections:", selectionsPayload);
+
+        // alert("성공적으로 제출되었습니다!");
+        // 필요하다면 페이지 이동 등을 수행
+        // navigate('/list');
+        
+        // 반환된 voice_id를 사용하여 결과 페이지로 이동 (res가 axios response.data임)
+        // submitSpeechSynthesis returns res.data which contains { voice_id, final_url, message }
+        const res = await submitSpeechSynthesis(speechId, selectionsPayload);
+        
+        navigate(`/voice/${res.voice_id}/result`);
+
+    } catch (error) {
+        console.error("Submission failed:", error);
+        alert("제출에 실패했습니다.");
+    }
+  };
 
 
   console.log("Speech Detail Data:", speech); // 디버깅용 로그
@@ -713,12 +757,20 @@ const SpeechDetailPage = () => {
             <span>{formattedDuration}</span>
           </div>
         </div>
-        <button 
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-[#7DCC74] hover:bg-[#66BB6A] text-white rounded-lg font-bold transition-colors cursor-pointer"
-        >
-          목록으로
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors cursor-pointer"
+          >
+            목록으로
+          </button>
+          <button 
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-[#7DCC74] hover:bg-[#66BB6A] text-white rounded-lg font-bold transition-colors cursor-pointer"
+          >
+            최종제출
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}

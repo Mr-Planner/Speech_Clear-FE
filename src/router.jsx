@@ -3,15 +3,15 @@ import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
 
 // Pages
-import HomePage from "./pages/home/HomePage";
-import SpeechDetailPage from "./pages/speech/SpeechDetailPage";
-import FeedbackPage from "./pages/speech/FeedbackPage";
-import ResultPage from "./pages/speech/ResultPage";
-import TrashPage from "./pages/speech/TrashPage";
-import SettingPage from "./pages/home/SettingPage";
 import LoginPage from "./pages/auth/LoginPage";
 import SignUpPage from "./pages/auth/SignUpPage";
+import HomePage from "./pages/home/HomePage";
+import SettingPage from "./pages/home/SettingPage";
+import FeedbackPage from "./pages/speech/FeedbackPage";
 import RecordingPage from "./pages/speech/RecordingPage";
+import ResultPage from "./pages/speech/ResultPage";
+import SpeechDetailPage from "./pages/speech/SpeechDetailPage";
+import TrashPage from "./pages/speech/TrashPage";
 
 const router = createBrowserRouter([
   {
@@ -47,6 +47,9 @@ const router = createBrowserRouter([
 
       // 10) /:folderId/:speechId/result
       { path: ":folderId/:speechId/result", element: <ResultPage /> },
+
+      // 11) /voice/:voiceId/result (최종 제출 결과 페이지)
+      { path: "voice/:voiceId/result", element: <ResultPage /> },
     ],
   },
 ]);

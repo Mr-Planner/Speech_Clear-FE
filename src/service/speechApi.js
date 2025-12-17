@@ -96,3 +96,35 @@ export async function fetchSpeeches(folderId) {
   const data = await res.json();
   return data.voices; // { voices: [...] } 형태에서 배열만 반환
 }
+
+// 스피치 합성 요청 (최종 제출)
+// 스피치 합성 요청 (최종 제출)
+export async function submitSpeechSynthesis(voiceId, selections) {
+  const accessToken = useAuthStore.getState().accessToken;
+
+  const res = await axios.post(`${BASE_URL}/voice/synthesize/${voiceId}`, selections, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    withCredentials: true,
+  });
+
+  return res.data;
+}
+
+// 결과 비교 조회
+export async function fetchCompareFeedback(voiceId) {
+  const accessToken = useAuthStore.getState().accessToken;
+  const res = await fetch(`${BASE_URL}/voice/${voiceId}/compare-feedback`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch comparison");
+  }
+
+  return await res.json();
+}
