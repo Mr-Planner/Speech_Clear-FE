@@ -53,6 +53,7 @@ const SpeechDetailPage = () => {
   const [countdown, setCountdown] = useState(null); // 카운트다운 상태 추가
   const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행률 상태 추가
   const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
+  const [progressModalConfig, setProgressModalConfig] = useState({ title: null, message: null });
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null); // 스트림을 미리 로드하여 보관
   const isWaitingForVoiceRef = useRef(false); // interval 내에서 최신 상태 참조용
@@ -306,6 +307,8 @@ const SpeechDetailPage = () => {
     setIsRecording(false);
     
     // UI 즉시 반응을 위해 처리 중 상태 표시
+    // 재녹음은 기본 텍스트 사용 (config 초기화)
+    setProgressModalConfig({ title: null, message: null });
     setIsProcessing(true);
     setUploadProgress(10); // 초기 진입 시 10%
 
@@ -414,11 +417,76 @@ const SpeechDetailPage = () => {
     }, 500);
   };
 
+  // 재녹음 버전이 하나라도 있는지 확인 (기존 로직 유지)
+  const hasReRecordings = useMemo(() => {
+    return allSegments.some(seg => seg.versions && seg.versions.length > 0);
+  }, [allSegments]);
+
+  // "하나라도 재녹음 버전이 선택되었는지" 확인
+  // 기본적으로 재녹음이 있으면 최신버전이 선택된 것으로 간주(undefined일 때).
+  // 따라서 사용자가 명시적으로 '원본'(-1)을 선택하지 않은 재녹음 보유 세그먼트가 하나라도 있으면 true.
+  const isAnyReRecordingSelected = useMemo(() => {
+    return allSegments.some(seg => {
+        // 재녹음본이 없으면 선택 불가 (항상 원본)
+        if (!seg.versions || seg.versions.length === 0) return false;
+
+        // 선택된 인덱스 확인
+        const selectedIdx = selectedVersions[seg.segment_id];
+        
+        // 1. 명시적으로 재녹음 선택 (0 이상)
+        if (selectedIdx !== undefined && selectedIdx >= 0) return true;
+
+        // 2. 선택 안했는데(undefined) 재녹음본이 존재함 -> 기본값이 최신 재녹음이므로 true
+        if (selectedIdx === undefined && seg.versions.length > 0) return true;
+
+        // 그 외 (명시적으로 -1 선택)
+        return false;
+    });
+  }, [allSegments, selectedVersions]);
+
   // 최종 제출 핸들러
   const handleSubmit = async () => {
     if (!speech || !speech.scripts) return;
 
-    if (!confirm("현재 선택된 버전으로 최종 제출하시겠습니까?")) return;
+    if (!confirm("현재 선택된 버전으로 최종 제출하시겠습니까? (시간이 소요될 수 있습니다)")) return;
+
+    // 진행 상태 모달 표시 재사용 (최종 제출 멘트로 변경)
+    setProgressModalConfig({ 
+        title: "최종 음성 파일 생성 중...", 
+        message: <>잠시만 기다려주세요.<br/>최종 음성 파일을 생성하고 있습니다.</> 
+    });
+    setIsProcessing(true);
+    setUploadProgress(0);
+
+    const userId = useAuthStore.getState().userId;
+    let eventSource = null;
+
+    if (userId) {
+        console.log("Connecting SSE for synthesis progress:", userId);
+        eventSource = new EventSource(`${BASE_URL}/voice/progress/${userId}`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                // message: "Processing... 10%" or just "50"
+                console.log("SSE Message:", event.data);
+                
+                // 숫자만 파싱 (예: "Processing 10%" -> 10)
+                const match = event.data.match(/(\d+)/);
+                if (match) {
+                    const progress = parseInt(match[0], 10);
+                    setUploadProgress(Math.min(progress, 99)); // 100은 완료 시점에
+                }
+            } catch (e) {
+                console.error("SSE parse error:", e);
+            }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error("SSE Error:", err);
+            // 에러 나도 메인 요청은 계속 진행되므로 굳이 여기서 close 안 함 (완료 시 닫음)
+            // eventSource.close(); 
+        };
+    }
 
     try {
         const selectionsPayload = {
@@ -445,21 +513,27 @@ const SpeechDetailPage = () => {
 
         console.log("Submitting selections:", selectionsPayload);
 
-        // alert("성공적으로 제출되었습니다!");
-        // 필요하다면 페이지 이동 등을 수행
-        // navigate('/list');
-        
-        // 반환된 voice_id를 사용하여 결과 페이지로 이동 (res가 axios response.data임)
-        // submitSpeechSynthesis returns res.data which contains { voice_id, final_url, message }
+        // 반환된 voice_id를 사용하여 결과 페이지로 이동
         const res = await submitSpeechSynthesis(speechId, selectionsPayload);
         
-        navigate(`/voice/${res.voice_id}/result`);
+        // 완료 처리
+        setUploadProgress(100);
+        setTimeout(() => {
+            navigate(`/voice/${res.voice_id}/result`); // 잠시 후 이동
+        }, 500);
 
     } catch (error) {
         console.error("Submission failed:", error);
         alert("제출에 실패했습니다.");
+        setIsProcessing(false);
+    } finally {
+        if (eventSource) {
+            eventSource.close();
+        }
+        // setIsProcessing(false); // 성공 시에는 navigate로 이동하므로 유지해도 됨, 실패 시에는 위에서 끔
     }
   };
+
 
 
   console.log("Speech Detail Data:", speech); // 디버깅용 로그
@@ -766,7 +840,12 @@ const SpeechDetailPage = () => {
           </button>
           <button 
             onClick={handleSubmit}
-            className="px-4 py-2 bg-[#7DCC74] hover:bg-[#66BB6A] text-white rounded-lg font-bold transition-colors cursor-pointer"
+            disabled={!isAnyReRecordingSelected}
+            className={`px-4 py-2 text-white rounded-lg font-bold transition-colors cursor-pointer
+                ${isAnyReRecordingSelected 
+                    ? 'bg-[#7DCC74] hover:bg-[#66BB6A]' 
+                    : 'bg-gray-300 cursor-not-allowed'}
+            `}
           >
             최종제출
           </button>
@@ -904,7 +983,7 @@ const SpeechDetailPage = () => {
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
                      <h3 className="text-lg font-bold text-gray-900">
-                         {activeVersionIndex === -1 ? "원본 분석 결과" : `재녹음 #${activeVersionIndex + 1} 결과`}
+                         {activeVersionIndex === -1 ? "원본 분석 결과" : `재녹음 ${activeVersionIndex + 1} 결과`}
                      </h3>
                      <div className="flex items-center gap-2">
                          <button
@@ -990,7 +1069,7 @@ const SpeechDetailPage = () => {
               </div>
 
               {/* Feedback */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8 flex-1 flex flex-col max-h-[350px]">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8 flex-none flex flex-col h-[300px]">
                 {/* Fixed Header */}
                 <div className="px-6 py-4 border-b border-gray-100 flex-none bg-white rounded-t-xl">
                     <h3 className="text-lg font-bold text-gray-900">상세 피드백</h3>
@@ -1069,7 +1148,9 @@ const SpeechDetailPage = () => {
       <ReRecordProgressModal 
         isOpen={isProcessing} 
         progress={uploadProgress} 
-        onClose={() => setIsProcessing(false)} 
+        onClose={() => setIsProcessing(false)}
+        title={progressModalConfig.title}
+        message={progressModalConfig.message}
       />
     </div>
   );
