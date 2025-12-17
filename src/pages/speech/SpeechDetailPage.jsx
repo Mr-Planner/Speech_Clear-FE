@@ -51,7 +51,8 @@ const SpeechDetailPage = () => {
   const [recordingDbList, setRecordingDbList] = useState([]);
   const [activeVersionIndex, setActiveVersionIndex] = useState(-1); // -1: 원본, 0+: 재녹음 버전
   const [countdown, setCountdown] = useState(null); // 카운트다운 상태 추가
-  const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행률 상태 추가
+  const [uploadProgress, setUploadProgress] = useState(0); 
+  const [isSubmitting, setIsSubmitting] = useState(false); // 재녹음 vs 최종 제출 구분을 위한 상태 // 업로드 진행률 상태 추가
   const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null); // 스트림을 미리 로드하여 보관
@@ -90,10 +91,24 @@ const SpeechDetailPage = () => {
   const totalValidSegments = validSegments.length;
 
   // 현재 세그먼트의 유효 인덱스 (몇 번째 유효 문장인지)
+  // 현재 세그먼트의 유효 인덱스 (몇 번째 유효 문장인지)
   const currentValidIndex = useMemo(() => {
     if (!currentSegment) return -1;
-    return validSegments.findIndex(s => s.segment_id === currentSegment.segment_id);
-  }, [currentSegment, validSegments]);
+    const idx = validSegments.findIndex(s => s.segment_id === currentSegment.segment_id);
+    if (idx !== -1) return idx;
+
+    // 피드백이 없는 경우: 현재 세그먼트보다 앞에 있는 유효 세그먼트 개수 계산
+    const currentIdxInAll = segments.findIndex(s => s.segment_id === currentSegment.segment_id);
+    const validBeforeCount = validSegments.filter(s => {
+       const sIdx = segments.findIndex(seg => seg.segment_id === s.segment_id);
+       return sIdx < currentIdxInAll;
+    }).length;
+    
+    // 0개 전이면 -1 (1/7 표현 위해 0이어야 하지만 버튼 disable 위해 -1 유지? 
+    // 화면 표시 로직에서 +1 하므로 validBeforeCount-1 하면 -> 0개일때 -1 -> 화면 0/7.
+    // 4개 전이면 3 -> 화면 4/7.
+    return validBeforeCount - 1; 
+  }, [currentSegment, validSegments, segments]);
 
   // 컴포넌트 언마운트 시 오디오 및 녹음 정지
   useEffect(() => {
@@ -307,6 +322,7 @@ const SpeechDetailPage = () => {
     
     // UI 즉시 반응을 위해 처리 중 상태 표시
     setIsProcessing(true);
+    setIsSubmitting(false); // 재녹음 모드
     setUploadProgress(10); // 초기 진입 시 10%
 
     // 잠시 대기 후 마지막 데이터 처리
@@ -414,10 +430,26 @@ const SpeechDetailPage = () => {
     }, 500);
   };
 
-  // 재녹음 버전이 하나라도 있는지 확인
-  const hasReRecordings = useMemo(() => {
-    return allSegments.some(seg => seg.versions && seg.versions.length > 0);
-  }, [allSegments]);
+  // 재녹음 버전이 하나라도 선택되었는지 확인 (원본만 제출하는 것 방지)
+  const isAnyReRecordingSelected = useMemo(() => {
+    return allSegments.some(seg => {
+        // 1. 현재 선택된 버전 인덱스 확인
+        let selectedIdx = selectedVersions[seg.segment_id];
+
+        // 2. 선택된 게 없다면? (기본 로직: 최신 버전 사용, 없으면 원본 -1)
+        if (selectedIdx === undefined) {
+            const versions = seg.versions || [];
+            if (versions.length > 0) {
+                selectedIdx = versions.length - 1; // 최신 버전
+            } else {
+                selectedIdx = -1; // 원본
+            }
+        }
+        
+        // 원본(-1)이 아닌 것이 하나라도 있으면 true
+        return selectedIdx !== -1;
+    });
+  }, [allSegments, selectedVersions]);
 
   // 최종 제출 핸들러
   const handleSubmit = async () => {
@@ -425,7 +457,38 @@ const SpeechDetailPage = () => {
 
     if (!confirm("현재 선택된 버전으로 최종 제출하시겠습니까?")) return;
 
+    setIsProcessing(true);
+    setIsSubmitting(true); // 최종 제출 모드
+    setUploadProgress(10); // 초기 진입
+
+    let eventSource = null;
+
     try {
+        // 1. SSE 연결 설정
+        if (userId) {
+            eventSource = new EventSource(`${BASE_URL}/voice/progress/${userId}`);
+            
+            eventSource.onopen = () => {
+                console.log("Submit SSE Connection Opened");
+            };
+
+            eventSource.onmessage = (event) => {
+                const progress = parseInt(event.data, 10);
+                if (!isNaN(progress)) {
+                    console.log("Submit SSE Progress:", progress);
+                    setUploadProgress(Math.max(10, progress)); 
+                    if (progress === 100) {
+                        eventSource.close();
+                    }
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error("Submit SSE Error:", err);
+                eventSource.close();
+            };
+        }
+
         const selectionsPayload = {
             selections: allSegments.map(seg => {
                 // 1. 현재 선택된 버전 인덱스 확인
@@ -450,18 +513,26 @@ const SpeechDetailPage = () => {
 
         console.log("Submitting selections:", selectionsPayload);
 
-        // alert("성공적으로 제출되었습니다!");
-        // 필요하다면 페이지 이동 등을 수행
-        // navigate('/list');
-        
-        // 반환된 voice_id를 사용하여 결과 페이지로 이동 (res가 axios response.data임)
         // submitSpeechSynthesis returns res.data which contains { voice_id, final_url, message }
         const res = await submitSpeechSynthesis(speechId, selectionsPayload);
         
-        navigate(`/voice/${res.voice_id}/result`);
+        // SSE 완료 보장 및 모달 닫기
+        setUploadProgress(100);
+        if (eventSource) eventSource.close();
+
+        // 잠시 대기 후 결과 페이지 이동
+        setTimeout(() => {
+             setIsProcessing(false);
+             setUploadProgress(0);
+             navigate(`/voice/${res.voice_id}/result`); // voice_id가 바뀌어서 옴 (새로운 row 생성 시)
+        }, 500);
 
     } catch (error) {
         console.error("Submission failed:", error);
+        
+        if (eventSource) eventSource.close();
+        setIsProcessing(false);
+        setUploadProgress(0);
         alert("제출에 실패했습니다.");
     }
   };
@@ -771,9 +842,9 @@ const SpeechDetailPage = () => {
           </button>
           <button 
             onClick={handleSubmit}
-            disabled={!hasReRecordings}
+            disabled={!isAnyReRecordingSelected}
             className={`px-4 py-2 text-white rounded-lg font-bold transition-colors cursor-pointer
-                ${hasReRecordings 
+                ${isAnyReRecordingSelected 
                     ? 'bg-[#7DCC74] hover:bg-[#66BB6A]' 
                     : 'bg-gray-300 cursor-not-allowed'}
             `}
@@ -867,16 +938,16 @@ const SpeechDetailPage = () => {
 
         {/* Right Column: Analysis & Feedback */}
         {/* Right Column: Analysis & Feedback */}
-        <section className="w-1/2 flex flex-col p-8 overflow-hidden bg-gray-50">
+        <section className="w-1/2 flex flex-col bg-gray-50 h-full">
           
           {totalValidSegments === 0 ? (
-             <div className="flex items-center justify-center h-full text-gray-500 text-lg font-medium">
+             <div className="flex items-center justify-center h-full text-gray-500 text-lg font-medium p-8">
                  피드백이 없습니다.
              </div>
           ) : (
              <>
                 {/* Navigation */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 px-8 pt-8">
             <button 
               onClick={handlePrev} 
               disabled={currentValidIndex <= 0}
@@ -885,7 +956,7 @@ const SpeechDetailPage = () => {
               <FaChevronLeft size={20} />
             </button>
             <span className="text-2xl font-bold text-gray-800">
-              {currentValidIndex !== -1 ? currentValidIndex + 1 : "-"} / {totalValidSegments}
+              {currentValidIndex !== -1 ? currentValidIndex + 1 : "0"} / {totalValidSegments}
             </span>
             <button 
               onClick={handleNext} 
@@ -898,8 +969,10 @@ const SpeechDetailPage = () => {
 
           {currentSegment ? (
             <>
+
+              <div className="flex-1 flex flex-col overflow-hidden px-8">
               {/* Graph Area */}
-              <div className="bg-white border border-gray-200 rounded-xl h-64 mb-8 p-4 shadow-sm relative w-full">
+              <div className="bg-white border border-gray-200 rounded-xl h-48 mb-4 p-4 shadow-sm relative w-full shrink-0">
                 {dBList.length > 0 || recordingDbList.length > 0 ? (
                     <Line data={chartData} options={chartOptions} />
                 ) : (
@@ -911,7 +984,7 @@ const SpeechDetailPage = () => {
 
               {/* Metrics */}
               {/* Version Navigation & Metrics */}
-              <div className="mb-8">
+              <div className="mb-4 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                      <h3 className="text-lg font-bold text-gray-900">
                          {activeVersionIndex === -1 ? "원본 분석 결과" : `재녹음 #${activeVersionIndex + 1} 결과`}
@@ -975,21 +1048,22 @@ const SpeechDetailPage = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 text-center">
                     <p className="text-sm text-gray-500 mb-1">목소리 크기</p>
                     <p className="text-xl font-bold text-gray-900">
                         {displayMetrics?.dB ? Number(displayMetrics.dB).toFixed(2) : 0} 
                         <span className="text-sm font-normal">dB</span>
                     </p>
                     </div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 text-center">
                     <p className="text-sm text-gray-500 mb-1">목소리 높낮이</p>
                     <p className="text-xl font-bold text-gray-900">
                         {displayMetrics?.pitch_mean_hz ? Number(displayMetrics.pitch_mean_hz).toFixed(2) : 0}
                         <span className="text-sm font-normal">Hz</span>
                     </p>
                     </div>
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 text-center">
                     <p className="text-sm text-gray-500 mb-1">말하기 속도</p>
                     <p className="text-xl font-bold text-gray-900">
                         {displayMetrics?.rate_wpm ? Number(displayMetrics.rate_wpm).toFixed(2) : 0}
@@ -1000,7 +1074,7 @@ const SpeechDetailPage = () => {
               </div>
 
               {/* Feedback */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8 flex-1 flex flex-col max-h-[350px]">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 flex-1 flex flex-col min-h-0">
                 {/* Fixed Header */}
                 <div className="px-6 py-4 border-b border-gray-100 flex-none bg-white rounded-t-xl">
                     <h3 className="text-lg font-bold text-gray-900">상세 피드백</h3>
@@ -1039,8 +1113,10 @@ const SpeechDetailPage = () => {
                 </div>
               </div>
 
+              </div>
+
               {/* Re-record Button */}
-              <div className="flex justify-center mt-auto flex-none">
+              <div className="flex justify-center p-8 pt-4 flex-none bg-gray-50 border-t border-gray-100">
                 <button 
                     onClick={handleRecordClick}
                     className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 cursor-pointer
@@ -1065,7 +1141,7 @@ const SpeechDetailPage = () => {
               </div>
             </>
           ) : (
-            <div className="text-center text-gray-500 mt-20">
+            <div className="flex items-center justify-center h-full text-gray-500 text-lg font-medium p-8">
               선택된 문장이 없습니다.
             </div>
           )}
@@ -1079,7 +1155,11 @@ const SpeechDetailPage = () => {
       <ReRecordProgressModal 
         isOpen={isProcessing} 
         progress={uploadProgress} 
-        onClose={() => setIsProcessing(false)} 
+        onClose={() => setIsProcessing(false)}
+        title={isSubmitting ? "최종 음성파일 생성 중" : undefined}
+        description={isSubmitting 
+            ? "잠시만 기다려주세요.\n최종 음성 파일을 생성하고 있습니다." 
+            : undefined}
       />
     </div>
   );

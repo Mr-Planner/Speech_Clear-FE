@@ -55,7 +55,7 @@ function HomePage() {
         onSuccess: () => {
             // 이 폴더의 스피치 리스트만 다시 가져오기
             queryClient.invalidateQueries({
-                queryKey: ["speeches", realFolderId],
+                queryKey: ["speeches"],
             });
         },
         onError: (error) => {

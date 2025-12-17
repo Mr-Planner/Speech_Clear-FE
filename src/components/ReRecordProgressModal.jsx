@@ -1,5 +1,11 @@
 
-const ReRecordProgressModal = ({ isOpen, progress, onClose }) => {
+const ReRecordProgressModal = ({ 
+    isOpen, 
+    progress, 
+    onClose, 
+    title = "재녹음 분석 중...", 
+    description = "잠시만 기다려주세요.\n서버에서 음성을 분석하고 있습니다." 
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -15,13 +21,13 @@ const ReRecordProgressModal = ({ isOpen, progress, onClose }) => {
         </button> */}
 
         <h3 className="text-2xl font-bold text-gray-900 mb-8">
-            {progress < 100 ? "재녹음 분석 중..." : "분석 완료!"}
+            {progress < 100 ? title : "완료!"}
         </h3>
 
         <div className="w-full px-4">
             <div className="flex justify-between mb-2">
             <span className="text-sm font-medium text-[#4687e1]">
-                {progress < 100 ? "업로드 및 분석 중..." : "완료"}
+                {progress < 100 ? "처리 중..." : "완료"}
             </span>
             <span className="text-sm font-medium text-[#4687e1]">{progress}%</span>
             </div>
@@ -33,9 +39,8 @@ const ReRecordProgressModal = ({ isOpen, progress, onClose }) => {
             </div>
         </div>
 
-        <p className="text-gray-500 mt-6 text-sm text-center">
-            잠시만 기다려주세요.<br/>
-            서버에서 음성을 분석하고 있습니다.
+        <p className="text-gray-500 mt-6 text-sm text-center whitespace-pre-line">
+            {description}
         </p>
       </div>
     </div>
