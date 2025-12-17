@@ -68,7 +68,6 @@ function HomePage() {
         }
     };
 
-    // todo 최신순 / 시간순 / 피드백 개수 순 정렬 예정 (완성도)
     return (
         <main className="flex-1 overflow-y-auto px-16 py-10">
             {isLoading && <p>로딩 중...</p>}
