@@ -1,10 +1,17 @@
+import axios from 'axios';
+import { useAuthStore } from "../store/auth/authStore";
+
 // todo 실제 서버 주소료 교체 
 export const BASE_URL = "http://localhost:8080"; 
 
 // 스피치 삭제 (서버)
 export async function deleteSpeech(speechId) {
-  const res = await fetch(`${BASE_URL}/speeches/${speechId}`, {
+  const accessToken = useAuthStore.getState().accessToken;
+  const res = await fetch(`${BASE_URL}/voice/${speechId}`, {
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
     credentials: "include",
   });
 
@@ -14,10 +21,6 @@ export async function deleteSpeech(speechId) {
 
   return true;
 }
-
-import { useAuthStore } from "../store/auth/authStore";
-
-import axios from 'axios';
 
 // 스피치 업로드 (분석 요청)
 export async function uploadSpeech(formData, onUploadProgress) {

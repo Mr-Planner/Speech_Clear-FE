@@ -9,7 +9,7 @@ import hideside from "../assets/sidebar/hideside.svg";
 import overflowMenu from "../assets/sidebar/overflow-menu.svg";
 import plus from "../assets/sidebar/plus.svg";
 import setting from "../assets/sidebar/setting.svg";
-import trash from "../assets/sidebar/trash.svg";
+
 
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from "../store/auth/authStore";
@@ -321,17 +321,7 @@ function SideBar({handleToggleSideBar}) {
                         </ul>
                     </li>
                         
-                    <li className="grid grid-cols-[1fr_auto_auto] items-center w-full h-9 px-2">
-                        <div 
-                            className="flex gap-1.5 items-center min-h-8 hover:bg-gray-200 rounded cursor-pointer" 
-                            onClick={() => handleNavigation("/trash")}
-                        >
-                            <img src={trash} alt = "휴지통"/>
-                            <span>휴지통</span>
-                        </div>
-                        <span></span>
-                        <span></span>
-                    </li>
+
                 </ul>
 
                 <ul className="px-4 absolute bottom-5 left-0 w-full">

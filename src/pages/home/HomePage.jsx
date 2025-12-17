@@ -63,7 +63,9 @@ function HomePage() {
     }); 
 
     const handleDeleteSpeech = (speechId) => {
-        deleteMutation.mutate(speechId);
+        if (window.confirm("정말로 이 스피치를 삭제하시겠습니까?")) {
+            deleteMutation.mutate(speechId);
+        }
     };
 
     // todo 최신순 / 시간순 / 피드백 개수 순 정렬 예정 (완성도)

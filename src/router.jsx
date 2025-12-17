@@ -11,7 +11,7 @@ import FeedbackPage from "./pages/speech/FeedbackPage";
 import RecordingPage from "./pages/speech/RecordingPage";
 import ResultPage from "./pages/speech/ResultPage";
 import SpeechDetailPage from "./pages/speech/SpeechDetailPage";
-import TrashPage from "./pages/speech/TrashPage";
+
 
 const router = createBrowserRouter([
   {
@@ -27,8 +27,7 @@ const router = createBrowserRouter([
       // 3) /:folderId/:speechId
       { path: ":folderId/:speechId", element: <SpeechDetailPage /> },
 
-      // 4) /trash
-      { path: "trash", element: <TrashPage /> },
+
 
       // 5) /setting
       { path: "setting", element: <SettingPage /> },
