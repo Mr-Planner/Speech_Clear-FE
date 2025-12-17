@@ -36,14 +36,16 @@ function HomePage() {
 
     // 서버에서 SpeechList가져오기
     // useQuery : GET(읽기) 전용
+    const userId = useAuthStore((state) => state.userId);
+
     const {
         data: speeches,
         isLoading,
         isError,
         error,
     } = useQuery({
-        queryKey: ["speeches", realFolderId],       // 캐시 key (폴더별로 캐시 분리)
-        queryFn: () => fetchSpeeches(realFolderId), // 실제 fetch 함수 
+        queryKey: ["speeches", realFolderId, userId],       // 캐시 key (폴더별, 유저별로 캐시 분리)
+        queryFn: () => fetchSpeeches(realFolderId), // 실제 fetch 함수  
         staleTime: 1000 * 60, // 1분까지는 fresh 데이터
     })
 
