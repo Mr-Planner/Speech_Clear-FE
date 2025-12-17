@@ -36,14 +36,16 @@ function HomePage() {
 
     // 서버에서 SpeechList가져오기
     // useQuery : GET(읽기) 전용
+    const userId = useAuthStore((state) => state.userId);
+
     const {
         data: speeches,
         isLoading,
         isError,
         error,
     } = useQuery({
-        queryKey: ["speeches", realFolderId],       // 캐시 key (폴더별로 캐시 분리)
-        queryFn: () => fetchSpeeches(realFolderId), // 실제 fetch 함수 
+        queryKey: ["speeches", realFolderId, userId],       // 캐시 key (폴더별, 유저별로 캐시 분리)
+        queryFn: () => fetchSpeeches(realFolderId), // 실제 fetch 함수  
         staleTime: 1000 * 60, // 1분까지는 fresh 데이터
     })
 
@@ -53,7 +55,7 @@ function HomePage() {
         onSuccess: () => {
             // 이 폴더의 스피치 리스트만 다시 가져오기
             queryClient.invalidateQueries({
-                queryKey: ["speeches", realFolderId],
+                queryKey: ["speeches"],
             });
         },
         onError: (error) => {
@@ -63,10 +65,11 @@ function HomePage() {
     }); 
 
     const handleDeleteSpeech = (speechId) => {
-        deleteMutation.mutate(speechId);
+        if (window.confirm("정말로 이 스피치를 삭제하시겠습니까?")) {
+            deleteMutation.mutate(speechId);
+        }
     };
 
-    // todo 최신순 / 시간순 / 피드백 개수 순 정렬 예정 (완성도)
     return (
         <main className="flex-1 overflow-y-auto px-16 py-10">
             {isLoading && <p>로딩 중...</p>}

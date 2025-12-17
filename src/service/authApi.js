@@ -1,5 +1,6 @@
 // src/services/authApi.js
 import axios from "axios";
+import { useAuthStore } from "../store/auth/authStore";
 
 // 공통 axios 인스턴스 
 const api = axios.create({
@@ -95,4 +96,18 @@ export async function checkEmailRequest(email) {
       throw new Error("중복 확인 중 오류가 발생했습니다.");
     }
   }
+}
+
+// 회원 탈퇴
+export async function deleteUser() {
+  const accessToken = useAuthStore.getState().accessToken;
+  
+  // axios delete는 두 번째 인자가 config
+  const res = await api.delete("/user/me", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    withCredentials: true,
+  });
+  return res.data;
 }
